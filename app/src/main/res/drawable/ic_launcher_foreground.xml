@@ -1,0 +1,31 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 日记本主体：白色圆角本子 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,30 L66,30 Q70,30 70,34 L70,74 Q70,78 66,78 L38,78 Q34,78 34,74 L34,34 Q34,30 38,30 Z" />
+    <!-- 书脊装饰线 -->
+    <path
+        android:fillColor="#FFD6E4FF"
+        android:pathData="M38,38 L66,38 L66,41 L38,41 Z" />
+    <path
+        android:fillColor="#FFD6E4FF"
+        android:pathData="M38,46 L66,46 L66,48 L38,48 Z" />
+    <path
+        android:fillColor="#FFD6E4FF"
+        android:pathData="M38,53 L58,53 L58,55 L38,55 Z" />
+    <!-- 笔（右上角，蓝色点缀） -->
+    <path
+        android:fillColor="#FF1677FF"
+        android:pathData="M60,26 L72,14 Q74,12 76,14 L78,16 Q80,18 78,20 L66,32 Z" />
+    <path
+        android:fillColor="#FF1677FF"
+        android:pathData="M64,30 L70,24 L72,26 L66,32 Z" />
+    <!-- 小圆点（心情标记） -->
+    <path
+        android:fillColor="#FF1677FF"
+        android:pathData="M62,64 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+</vector>

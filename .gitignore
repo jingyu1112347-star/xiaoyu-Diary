@@ -1,0 +1,27 @@
+# 本地 SDK/JDK 路径（含本机绝对路径与用户名，禁止入库）
+local.properties
+
+# Gradle 缓存与构建产物
+.gradle/
+build/
+*/build/
+# Android 发布产物（APK/AAB/基线配置等可重新生成）
+app/release/
+app/debug/
+*.apk
+*.aab
+*.ap_
+.externalNativeBuild/
+.cxx/
+
+# IDE 配置（含本机路径与个人设置）
+.idea/
+*.iml
+
+# 日志与截图
+*.log
+captures/
+
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+<resources>
+    <color name="primary">#FF1677FF</color>
+    <color name="success">#FF52C41A</color>
+    <color name="warn">#FFFA8C16</color>
+    <color name="danger">#FFF5222D</color>
+    <color name="ink1">#FF1A1D24</color>
+    <color name="ink2">#FF5A6172</color>
+    <color name="ink3">#FF98A2B3</color>
+    <color name="line">#FFEEF0F4</color>
+    <color name="soft">#FFF5F7FA</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
