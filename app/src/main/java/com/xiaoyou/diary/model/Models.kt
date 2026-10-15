@@ -30,9 +30,10 @@ data class BehaviorProbability(
 )
 
 data class AttitudeParams(
-    val pitch: Float = -12.4f,
-    val roll: Float = 3.8f,
-    val yaw: Float = 87.2f
+    // 默认 0 为中性占位，真实数值仅在检测时由分析结果填入
+    val pitch: Float = 0f,
+    val roll: Float = 0f,
+    val yaw: Float = 0f
 )
 
 data class HistorySession(
@@ -42,12 +43,16 @@ data class HistorySession(
     val primaryBehavior: BehaviorType,
     val switchCount: Int,
     val totalDuration: String,
-    val segments: List<Pair<BehaviorType, Float>>
+    val segments: List<Pair<BehaviorType, Float>>,
+    /** 会话起始时间戳，供列表排序使用（id 为随机 UUID 不可排序） */
+    val startMs: Long = 0L
 )
 
 data class DiaryEntry(
     val id: String,
     val date: String,
+    /** yyyy-MM-dd 机器可读日期，用于筛选与排序（date 为展示文案，不可字典序排序） */
+    val sortDate: String = "",
     val dateLabel: String,
     val time: String,
     val mood: String,

@@ -23,7 +23,7 @@ class SettingsStorage(context: Context) {
     private val _threshold = MutableStateFlow(prefs.getFloat(KEY_THRESHOLD, 0.75f))
     val threshold: StateFlow<Float> = _threshold.asStateFlow()
 
-    private val _darkMode = MutableStateFlow(prefs.getBoolean(KEY_DARK_MODE, false))
+    private val _darkMode = MutableStateFlow(prefs.getBoolean(KEY_DARK_MODE, true)) // 深色优先：默认开启
     val darkMode: StateFlow<Boolean> = _darkMode.asStateFlow()
 
     private val _sedentaryReminder = MutableStateFlow(prefs.getBoolean(KEY_SEDENTARY, true))

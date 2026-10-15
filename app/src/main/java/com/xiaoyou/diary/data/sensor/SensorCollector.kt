@@ -53,19 +53,23 @@ class SensorCollector(context: Context) {
                                 event.values[2] * event.values[2]
                     )
                     _accelMagnitude.value = mag
-                    // 简单一阶低通滤波分离重力
-                    val alpha = 0.8f
-                    val g = _gravity.value
-                    g[0] = alpha * g[0] + (1 - alpha) * event.values[0]
-                    g[1] = alpha * g[1] + (1 - alpha) * event.values[1]
-                    g[2] = alpha * g[2] + (1 - alpha) * event.values[2]
-                    _gravity.value = g
+                    // 设备没有独立重力传感器时，用一阶低通滤波从加速度估算重力。
+                    // 必须生成新数组再发射，原地修改同一实例会被 StateFlow 去重，
+                    // 导致订阅者收不到更新。
+                    val g: FloatArray
+                    if (gravitySensor == null) {
+                        val alpha = 0.8f
+                        val old = _gravity.value
+                        g = FloatArray(3)
+                        g[0] = alpha * old[0] + (1 - alpha) * event.values[0]
+                        g[1] = alpha * old[1] + (1 - alpha) * event.values[1]
+                        g[2] = alpha * old[2] + (1 - alpha) * event.values[2]
+                        _gravity.value = g
+                    } else {
+                        g = _gravity.value
+                    }
                     // 用户加速度 = 原始 - 重力
-                    val ua = FloatArray(3)
-                    ua[0] = event.values[0] - g[0]
-                    ua[1] = event.values[1] - g[1]
-                    ua[2] = event.values[2] - g[2]
-                    _userAccel.value = ua
+                    _userAccel.value = FloatArray(3) { i -> event.values[i] - g[i] }
                 }
                 Sensor.TYPE_GYROSCOPE -> {
                     _gyro.value = event.values.copyOf()
@@ -109,15 +113,17 @@ class SensorCollector(context: Context) {
     }
 
     /**
-     * 将 Hz 转换为 SensorManager 的采样延迟（微秒）。
-     * 注意：永不返回 SENSOR_DELAY_FASTEST(0)，否则在 Android 12+ 上
-     * 未声明 HIGH_SAMPLING_RATE_SENSORS 权限会直接抛出 SecurityException 闪退，
-     * 且 0us 会导致过高采样率带来耗电与性能开销。最高封顶到 GAME(约 50Hz)。
+     * 将 Hz 转换为 SensorManager 的采样延迟（微秒），尽量贴近用户设置的采样率。
+     * 限制：
+     * - 最高封顶到 GAME(19980us，约 50Hz)：Android 12+ 未声明
+     *   HIGH_SAMPLING_RATE_SENSORS 权限时更短延迟会被系统拒绝甚至抛 SecurityException，
+     *   同时避免过高采样带来耗电与性能开销（设置页滑条上限也为 50Hz）。
+     * - 最低不低于 NORMAL，避免传入过小值反而被系统忽略。
      */
-    private fun hzToDelay(hz: Int): Int = when {
-        hz >= 60 -> SensorManager.SENSOR_DELAY_GAME
-        hz >= 30 -> SensorManager.SENSOR_DELAY_UI
-        else -> SensorManager.SENSOR_DELAY_NORMAL
+    private fun hzToDelay(hz: Int): Int {
+        val safeHz = hz.coerceIn(1, 50)
+        val us = 1_000_000 / safeHz
+        return us.coerceIn(SensorManager.SENSOR_DELAY_GAME, SensorManager.SENSOR_DELAY_NORMAL)
     }
 
     fun stop() {

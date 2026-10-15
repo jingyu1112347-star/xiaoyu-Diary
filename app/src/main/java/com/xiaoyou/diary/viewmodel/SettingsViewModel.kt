@@ -37,11 +37,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     var storageLimitDays by mutableStateOf(settings.storageLimitDays.value)
         private set
 
-    private val sensitivitySteps = listOf(25, 50, 68, 85, 100)
-    private val sampleRateSteps = listOf(25, 50, 100, 200)
-    private val thresholdSteps = listOf(0.5f, 0.6f, 0.65f, 0.7f, 0.75f, 0.8f, 0.85f, 0.9f)
-    private val intervalSteps = listOf(15, 30, 45, 60, 90, 120)
-
     init {
         // 同步外部变更（如其它页面修改）到 UI State
         viewModelScope.launch {
@@ -76,32 +71,20 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun adjustSensitivity(onToast: (String) -> Unit) {
-        val idx = sensitivitySteps.indexOf(sensitivityValue)
-        val next = sensitivitySteps[(idx + 1) % sensitivitySteps.size]
-        settings.setSensitivity(next)
-        onToast("检测灵敏度：$next%")
-    }
+    // ---- 滑块直设（新设置页） ----
+    val sensitivitySteps = listOf(25, 50, 68, 85, 100)
 
-    fun cycleSampleRate(onToast: (String) -> Unit) {
-        val idx = sampleRateSteps.indexOf(sampleRate)
-        val next = sampleRateSteps[(idx + 1) % sampleRateSteps.size]
-        settings.setSampleRate(next)
-        onToast("采样率已切换为：$next Hz")
-    }
+    fun setSampleRateDirect(value: Int) { settings.setSampleRate(value) }
+    fun setThresholdDirect(value: Float) { settings.setThreshold(value) }
+    fun setSensitivityDirect(value: Int) { settings.setSensitivity(value) }
+    fun setIntervalDirect(value: Int) { settings.setReminderInterval(value) }
 
-    fun cycleThreshold(onToast: (String) -> Unit) {
-        val idx = thresholdSteps.indexOf(thresholdValue)
-        val next = thresholdSteps[(idx + 1) % thresholdSteps.size]
-        settings.setThreshold(next)
-        onToast("判定阈值已设置为：%.2f".format(next))
-    }
-
-    fun cycleInterval(onToast: (String) -> Unit) {
-        val idx = intervalSteps.indexOf(reminderInterval)
-        val next = intervalSteps[(idx + 1) % intervalSteps.size]
-        settings.setReminderInterval(next)
-        onToast("久坐提醒间隔：每 $next 分钟")
+    fun sensitivityLabel(): String = when (sensitivityValue) {
+        25 -> "低"
+        50 -> "偏低"
+        68 -> "中"
+        85 -> "高"
+        else -> "灵敏"
     }
 
     fun toggleSedentary(onToast: (String) -> Unit) {

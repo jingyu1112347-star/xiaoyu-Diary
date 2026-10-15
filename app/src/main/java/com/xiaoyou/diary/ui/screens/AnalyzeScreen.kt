@@ -3,16 +3,22 @@ package com.xiaoyou.diary.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.*
@@ -21,8 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import kotlin.math.min
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -31,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xiaoyou.diary.model.BehaviorType
 import com.xiaoyou.diary.ui.components.*
-import com.xiaoyou.diary.ui.theme.*
+import com.xiaoyou.diary.ui.theme.LocalAppColors
 import com.xiaoyou.diary.viewmodel.AnalyzeViewModel
 import com.xiaoyou.diary.viewmodel.AppViewModel
 import java.text.SimpleDateFormat
@@ -39,534 +45,554 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyzeScreen(appVm: AppViewModel, analyzeVm: AnalyzeViewModel) {
-    val colors = LocalAppColors.current
-    var activeTrend by remember { mutableStateOf("行走") }
-
-    // 监听数据库 Flow：records 变化时自动重组，统计结果实时刷新（Bug 4）
+    val c = LocalAppColors.current
     val records by analyzeVm.allRecords.collectAsState()
 
-    // 当前选中周的周一 0 点时间戳；默认定位到今天所在的自然周（Bug 1）
-    var weekMonday by remember {
-        val cal = Calendar.getInstance().apply {
-            firstDayOfWeek = Calendar.MONDAY
-            minimalDaysInFirstWeek = 4
-            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            set(Calendar.HOUR_OF_DAY, 0)
-            clear(Calendar.MINUTE); clear(Calendar.SECOND); clear(Calendar.MILLISECOND)
-        }
-        mutableStateOf(cal.timeInMillis)
-    }
-    val weekStartMs = weekMonday
-    val weekEndMs = weekMonday + TimeUnit.DAYS.toMillis(7)
-    val todayStartMs = remember {
+    // 日 / 周 分段
+    var rangeMode by remember { mutableStateOf(1) } // 0=日 1=周
+
+    // 锚点：日模式为选中日 0 点；周模式为选中周的周一 0 点（ISO，周一、minimalDays=4）
+    fun mondayOf(ms: Long): Long = Calendar.getInstance().apply {
+        firstDayOfWeek = Calendar.MONDAY
+        minimalDaysInFirstWeek = 4
+        timeInMillis = ms
+        set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+        set(Calendar.HOUR_OF_DAY, 0)
+        clear(Calendar.MINUTE); clear(Calendar.SECOND); clear(Calendar.MILLISECOND)
+    }.timeInMillis
+
+    val todayStart = remember {
         Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0); clear(Calendar.MINUTE); clear(Calendar.SECOND); clear(Calendar.MILLISECOND)
         }.timeInMillis
     }
-    val isCurrentWeek = todayStartMs in weekStartMs until weekEndMs
+    var anchorDay by remember { mutableStateOf(todayStart) }
+    var weekMonday by remember { mutableStateOf(mondayOf(todayStart)) }
 
-    // 选中周的统计区间过滤（切换周时自动重新统计，Bug 2）
-    val weekRecords = records.filter { it.startTimeMs in weekStartMs until weekEndMs }
+    val rangeStart = if (rangeMode == 0) anchorDay else weekMonday
+    val rangeSpan = if (rangeMode == 0) TimeUnit.DAYS.toMillis(1) else TimeUnit.DAYS.toMillis(7)
+    val rangeEnd = rangeStart + rangeSpan
+    val isCurrentRange = todayStart in rangeStart until rangeEnd
 
-    // 周标签：年份 + ISO 周数 + 日期范围
+    val rangeRecords = records.filter { it.startTimeMs in rangeStart until rangeEnd }
+
+    // 周标题（年份 + ISO 周数 + 周一至周日）
     val weekCal = remember(weekMonday) {
         Calendar.getInstance().apply {
             firstDayOfWeek = Calendar.MONDAY; minimalDaysInFirstWeek = 4
-            timeInMillis = weekMonday + TimeUnit.DAYS.toMillis(3) // 用周四确定所属年份/周
+            timeInMillis = weekMonday + TimeUnit.DAYS.toMillis(3)
         }
     }
-    val yearStr = weekCal.get(Calendar.YEAR)
-    val weekNum = weekCal.get(Calendar.WEEK_OF_YEAR)
-    val mdFmt = SimpleDateFormat("MM.dd", Locale.getDefault())
-    val rangeStr = "${mdFmt.format(Date(weekStartMs))} - ${mdFmt.format(Date(weekEndMs - 1))}"
+    val mdFmt = SimpleDateFormat("MM.dd E", Locale.CHINESE)
+    val mdyFmt = SimpleDateFormat("M月d日 E", Locale.CHINESE)
+    val centerTitle = if (rangeMode == 0) mdyFmt.format(Date(anchorDay))
+    else "${weekCal.get(Calendar.YEAR)} · 第 ${weekCal.get(Calendar.WEEK_OF_YEAR)} 周"
+    val centerSub = if (rangeMode == 0) "当日统计"
+    else "${mdFmt.format(Date(rangeStart))} – ${mdFmt.format(Date(rangeEnd - 1))}"
 
-    // 日历选择器（Bug 3）
     var showCalendar by remember { mutableStateOf(false) }
 
-    // 从本周记录实时计算指标
-    val totalSec = weekRecords.sumOf { it.durationSec }
+    // ---------- 统计指标（实时订阅 Flow） ----------
+    val totalSec = rangeRecords.sumOf { it.durationSec }
     val totalH = totalSec / 3600
     val totalM = (totalSec % 3600) / 60
-    val totalDurationStr = "%02d:%02d".format(totalH, totalM)
-    val detectCount = weekRecords.map { it.sessionId }.distinct().size
+    val detectCount = rangeRecords.map { it.sessionId }.distinct().size
     val passRate = if (totalSec > 0) ((totalSec / 3600f) / 8f * 100).coerceAtMost(100f) else 0f
-    val behaviorDurations = weekRecords.groupBy { it.behaviorName }
+    val behaviorDurations = rangeRecords.groupBy { it.behaviorName }
         .mapValues { (_, list) -> list.sumOf { it.durationSec } }
-    val primaryName = behaviorDurations.maxByOrNull { it.value }?.key ?: BehaviorType.WALK.name
-    val primaryBehavior = try { BehaviorType.valueOf(primaryName) } catch (_: Exception) { BehaviorType.WALK }
-    val primaryBehaviorLabel = primaryBehavior.label
+    val primaryType = behaviorDurations.maxByOrNull { it.value }?.key
+        ?.let { runCatching { BehaviorType.valueOf(it) }.getOrNull() }
+        ?: BehaviorType.WALK
 
-    // 环形图数据：从本周记录实时构建
-    val donutData: List<Pair<Color, Float>> = if (behaviorDurations.isNotEmpty()) {
+    // 环形图分段
+    val donutSegments: List<Pair<BehaviorType, Float>> = if (behaviorDurations.isNotEmpty()) {
         val total = behaviorDurations.values.sum().coerceAtLeast(1)
-        behaviorDurations.entries.sortedByDescending { it.value }.take(8).map { (name, dur) ->
-            val type = try { BehaviorType.valueOf(name) } catch (_: Exception) { BehaviorType.WALK }
-            type.color to (dur.toFloat() / total * 100f)
-        }
-    } else {
-        listOf(
-            BehaviorWalk to 38f, BehaviorSit to 27f, BehaviorStand to 15f,
-            BehaviorJog to 9f, BehaviorRun to 5f, BehaviorTilt to 3f,
-            BehaviorLie to 2f, BehaviorSideLie to 1f
-        )
-    }
-    val primaryPct = donutData.firstOrNull()?.second ?: 0f
+        behaviorDurations.entries.sortedByDescending { it.value }
+            .map { (name, dur) ->
+                (runCatching { BehaviorType.valueOf(name) }.getOrNull() ?: BehaviorType.WALK) to
+                    (dur.toFloat() / total * 100f)
+            }
+    } else emptyList()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.bg)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    // 24 小时分布（区间内按时段汇总）。先按秒累加，最后四舍五入到分钟，
+    // 避免不足 1 分钟的尾段（如停止时补录的 1~29 秒）被整除直接清零。
+    val hourlyMinutes = remember(rangeRecords) {
+        val secArr = IntArray(24)
+        val cal = Calendar.getInstance()
+        rangeRecords.forEach { r ->
+            cal.timeInMillis = r.startTimeMs
+            secArr[cal.get(Calendar.HOUR_OF_DAY)] += r.durationSec
+        }
+        IntArray(24) { (secArr[it] + 30) / 60 }
+    }
+
+    // 周趋势：区间所在 7 天（或日模式下最近 7 个锚点日）的活动分钟。
+    // 单次遍历归桶，不再对每一天做一次全量 filter。
+    val trendMinutes = remember(records, rangeRecords, rangeStart, anchorDay, rangeMode) {
+        val dayMs = TimeUnit.DAYS.toMillis(1)
+        val base = if (rangeMode == 1) rangeStart else anchorDay - 6 * dayMs
+        val source = if (rangeMode == 1) rangeRecords else records
+        val secArr = IntArray(7)
+        val cal = Calendar.getInstance()
+        source.forEach { r ->
+            cal.timeInMillis = r.startTimeMs
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.clear(Calendar.MINUTE); cal.clear(Calendar.SECOND); cal.clear(Calendar.MILLISECOND)
+            val idx = ((cal.timeInMillis - base) / dayMs).toInt()
+            if (idx in 0..6) secArr[idx] += r.durationSec
+        }
+        IntArray(7) { (secArr[it] + 30) / 60 }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(c.bg)) {
+     Column(modifier = Modifier.fillMaxSize()) {
+        // ---------- 导航栏 ----------
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(52.dp)
-                .padding(horizontal = 20.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("数据分析", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.ink1)
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { appVm.showToast("数据已导出到剪贴板") },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = colors.navIcon, modifier = Modifier.size(17.dp))
+            Column {
+                Text("数据分析", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = c.ink, letterSpacing = (-0.5f).sp)
+                Text("行为统计可视化", fontSize = 12.5.sp, color = c.ink3)
+            }
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillIconButton(Icons.Filled.CalendarMonth, "选择日期", onClick = { showCalendar = true })
+                PillIconButton(Icons.AutoMirrored.Filled.OpenInNew, "导出", onClick = {
+                    // 接线到真实导出：生成 JSON 文件并调起系统分享
+                    analyzeVm.exportData(context) { ok, _ ->
+                        appVm.showToast(
+                            if (ok) "数据已导出，正在打开分享" else "导出失败，请重试",
+                            if (ok) ToastType.OK else ToastType.ERROR
+                        )
+                    }
+                })
             }
         }
 
         LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            // 内容不足一屏时严格垂直居中；超出时自然顶部起滚
+            verticalArrangement = Arrangement.Center,
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 130.dp)
         ) {
-            // Week selector
+            // ---------- 日 / 周 分段控件 ----------
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(c.surface2)
+                        .padding(3.dp)
                 ) {
-                    Text("‹", fontSize = 20.sp, color = if (weekMonday <= todayStartMs - TimeUnit.DAYS.toMillis(365)) colors.ink3.copy(alpha = 0.3f) else colors.ink3,
-                        modifier = Modifier.clickable {
-                            if (weekMonday > todayStartMs - TimeUnit.DAYS.toMillis(365)) {
-                                weekMonday -= TimeUnit.DAYS.toMillis(7)
-                            }
-                        }.padding(horizontal = 12.dp, vertical = 6.dp))
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clickable { showCalendar = true }
-                    ) {
-                        Text("$yearStr 年 · 第 $weekNum 周", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.ink1)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(rangeStr, fontSize = 11.sp, color = colors.ink3)
-                            Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Default.CalendarMonth, null, tint = if (isCurrentWeek) Primary else colors.ink3, modifier = Modifier.size(11.dp))
-                            if (isCurrentWeek) {
-                                Spacer(Modifier.width(3.dp))
-                                Text("本周", fontSize = 10.sp, color = Primary)
-                            }
+                    listOf("日", "周").forEachIndexed { i, label ->
+                        val on = rangeMode == i
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (on) c.elevated else Color.Transparent)
+                                .tapScale { rangeMode = i },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                label,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (on) c.ink else c.ink3
+                            )
                         }
                     }
-                    Text("›", fontSize = 20.sp, color = if (weekMonday >= todayStartMs) colors.ink3.copy(alpha = 0.3f) else colors.ink3,
-                        modifier = Modifier.clickable {
-                            if (weekMonday < todayStartMs) {
-                                weekMonday += TimeUnit.DAYS.toMillis(7)
-                            }
-                        }.padding(horizontal = 12.dp, vertical = 6.dp))
                 }
             }
 
-            // Summary 4 columns
+            // ---------- 区间导航 ----------
             item {
-                AppCard {
-                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
-                        SummaryCell("总时长", if (totalSec > 0) totalDurationStr else "--:--")
-                        VDivider()
-                        SummaryCell("检测次数", "$detectCount")
-                        VDivider()
-                        SummaryCellColored("主要行为", primaryBehaviorLabel, Success)
-                        VDivider()
-                        SummaryCell("达标率", "%.1f%%".format(passRate))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val canBack = rangeStart > todayStart - TimeUnit.DAYS.toMillis(365)
+                    CircleButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "上一${if (rangeMode == 0) "天" else "周"}",
+                        enabled = canBack,
+                        onClick = {
+                            if (rangeMode == 0) anchorDay -= TimeUnit.DAYS.toMillis(1)
+                            else weekMonday -= TimeUnit.DAYS.toMillis(7)
+                        })
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(centerTitle, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                            if (isCurrentRange) {
+                                Spacer(Modifier.width(7.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(c.greenSoft)
+                                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                                ) {
+                                    Text(if (rangeMode == 0) "今天" else "本周",
+                                        fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.green)
+                                }
+                            }
+                        }
+                        Text(centerSub, fontSize = 11.5.sp, color = c.ink3, modifier = Modifier.padding(top = 3.dp))
+                    }
+                    CircleButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, "下一${if (rangeMode == 0) "天" else "周"}",
+                        enabled = !isCurrentRange,
+                        onClick = {
+                            if (isCurrentRange) return@CircleButton
+                            if (rangeMode == 0) anchorDay += TimeUnit.DAYS.toMillis(1)
+                            else weekMonday += TimeUnit.DAYS.toMillis(7)
+                        })
+                }
+            }
+
+            // ---------- 2×2 统计格 ----------
+            item {
+                AppSurface(modifier = Modifier.padding(top = 10.dp, bottom = 26.dp)) {
+                    Column {
+                        Row {
+                            StatCell("总时长", if (totalSec > 0) "${totalH}h ${totalM}m" else "--",
+                                tone = c.yellow)
+                            Box(Modifier.width(1.dp).height(72.dp).background(c.rule))
+                            StatCell("检测次数", "$detectCount", suffix = "次", tone = c.blue)
+                        }
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+                        Row {
+                            StatCell("主要行为", primaryType.label, tone = c.purple, big = false)
+                            Box(Modifier.width(1.dp).height(72.dp).background(c.rule))
+                            StatCell("达标率", "%.0f".format(passRate), suffix = "%", tone = c.green)
+                        }
                     }
                 }
             }
 
-            // Behavior structure - donut chart
+            // ---------- 行为占比 ----------
             item {
-                AppCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("行为结构", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.ink1)
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(124.dp)) {
-                                DonutChart(donutData)
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text("主要行为", fontSize = 10.sp, color = colors.ink3)
-                                    Text(primaryBehaviorLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = colors.ink1)
-                                    Text("%.1f%%".format(primaryPct), fontSize = 11.sp, color = colors.ink2)
-                                }
-                            }
+                GroupHeader("行为占比", accent = true, modifier = Modifier.padding(bottom = 11.dp),
+                    trailing = { Text(if (rangeMode == 1) "本周" else "当日", fontSize = 12.sp, color = c.ink3) })
+                AppSurface(modifier = Modifier.padding(bottom = 26.dp)) {
+                    if (donutSegments.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 34.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("暂无行为数据", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                            Text(
+                                "完成一次检测后生成占比分析",
+                                fontSize = 12.sp, color = c.ink3,
+                                modifier = Modifier.padding(top = 5.dp)
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DonutChart(donutSegments, "%.0f%%".format(passRate))
                             Spacer(Modifier.width(20.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                val items = if (behaviorDurations.isNotEmpty()) {
-                                    val total = behaviorDurations.values.sum().coerceAtLeast(1)
-                                    behaviorDurations.entries.sortedByDescending { it.value }.take(8).map { (name, dur) ->
-                                        val type = try { BehaviorType.valueOf(name) } catch (_: Exception) { BehaviorType.WALK }
-                                        type to "%.1f%%".format(dur.toFloat() / total * 100f)
-                                    }
-                                } else {
-                                    listOf(
-                                        BehaviorType.WALK to "38.0%", BehaviorType.SIT to "27.0%",
-                                        BehaviorType.STAND to "15.0%", BehaviorType.JOG to "9.0%",
-                                        BehaviorType.RUN to "5.0%", BehaviorType.TILT to "3.0%",
-                                        BehaviorType.LIE to "2.0%", BehaviorType.SIDE_LIE to "1.0%"
+                            DonutLegend(donutSegments, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+
+            // ---------- 24 小时分布 ----------
+            item {
+                GroupHeader("24 小时分布", modifier = Modifier.padding(bottom = 11.dp),
+                    trailing = { Text("← 横向滑动 →", fontSize = 12.sp, color = c.ink3) })
+                AppSurface(modifier = Modifier.padding(bottom = 26.dp)) {
+                    val maxMin = (hourlyMinutes.maxOrNull() ?: 0).coerceAtLeast(1)
+                    val peakHour = hourlyMinutes.indexOf(hourlyMinutes.maxOrNull() ?: 0)
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 18.dp, vertical = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.width(560.dp).height(120.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            hourlyMinutes.forEachIndexed { h, mins ->
+                                Column(
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    verticalArrangement = Arrangement.Bottom,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    if (h % 6 == 0) Text("$h", fontSize = 9.sp, color = c.ink3)
+                                    Spacer(Modifier.height(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(if (mins > 0) (20 + 80f * mins / maxMin).dp else 3.dp)
+                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomEnd = 2.dp, bottomStart = 2.dp))
+                                            .background(if (h == peakHour && mins > 0) c.yellow else c.blue.copy(alpha = 0.85f))
                                     )
                                 }
-                                items.chunked(2).forEach { rowItems ->
-                                    Row {
-                                        rowItems.forEachIndexed { idx, (type, pct) ->
-                                            Row(
-                                                modifier = Modifier.weight(1f).padding(vertical = 4.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Box(Modifier.size(8.dp).background(type.color, RoundedCornerShape(2.dp)))
-                                                Spacer(Modifier.width(6.dp))
-                                                Text(type.label, fontSize = 11.sp, color = colors.ink2, modifier = Modifier.weight(1f))
-                                                Text(pct, fontSize = 11.sp, color = colors.ink1)
-                                            }
-                                            if (idx == 0 && rowItems.size > 1) Spacer(Modifier.width(12.dp))
-                                        }
-                                        // Fill empty space for single-item rows
-                                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
-                                    }
-                                }
                             }
                         }
                     }
                 }
             }
 
-            // 24h bar chart
+            // ---------- 周趋势 ----------
             item {
-                AppCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("24 小时分布", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.ink1)
-                            Text("单位：分钟", fontSize = 11.sp, color = colors.ink3)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        BarChart24h()
-                        Spacer(Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("00", fontSize = 10.sp, color = colors.ink3)
-                            Text("06", fontSize = 10.sp, color = colors.ink3)
-                            Text("12", fontSize = 10.sp, color = colors.ink3)
-                            Text("18", fontSize = 10.sp, color = colors.ink3)
-                            Text("24", fontSize = 10.sp, color = colors.ink3)
-                        }
-                    }
-                }
-            }
-
-            // Weekly trend line chart
-            item {
-                AppCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("周趋势", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.ink1)
-                        Spacer(Modifier.height(8.dp))
-                        Row {
-                            TrendChip("行走", activeTrend == "行走", Success) { activeTrend = "行走" }
-                            Spacer(Modifier.width(8.dp))
-                            TrendChip("静坐", activeTrend == "静坐", colors.soft) { activeTrend = "静坐" }
-                            Spacer(Modifier.width(8.dp))
-                            TrendChip("站立", activeTrend == "站立", colors.soft) { activeTrend = "站立" }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        val lineColor = when (activeTrend) {
-                            "行走" -> Success
-                            "静坐" -> BehaviorSit
-                            else -> BehaviorStand
-                        }
-                        TrendLineChart(lineColor)
-                        Spacer(Modifier.height(4.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            listOf("一","二","三","四","五","六","日").forEach { Text(it, fontSize = 10.sp, color = colors.ink3) }
-                        }
-                    }
-                }
-            }
-
-            // Health analysis
-            item {
-                AppCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("健康分析与周总结", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.ink1)
-                        Spacer(Modifier.height(12.dp))
-                        HealthRow(Success, "🚶", "运动量达标",
-                            "本周累计行走 6:12，日均步态活动达标 5 天，优于上周。")
-                        Spacer(Modifier.height(14.dp))
-                        HealthRow(Warn, "⏰", "久坐风险提示",
-                            "周四连续静坐 3:20 未中断，建议每 60 分钟起身活动 3 分钟。")
-                        Spacer(Modifier.height(14.dp))
-                        HealthRow(Primary, "📈", "行为切换频次",
-                            "日均行为切换 42 次，活动节律正常，姿态分布均衡。")
-                    }
-                }
-            }
-            item { Spacer(Modifier.height(8.dp)) }
-        }
-        } // end inner Column
-
-        // 日历选择弹层（Bug 3）：点击日期跳转到该日期所属周
-        if (showCalendar) {
-            val datePickerState = rememberDatePickerState()
-            // 遮罩
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0x80101828))
-                    .clickable { showCalendar = false }
-            )
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(0.92f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(colors.sheetBg)
-                    .padding(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("选择日期", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.ink1)
-                    Box(
+                GroupHeader("周趋势 · 活动时长", accent = true, modifier = Modifier.padding(bottom = 11.dp),
+                    trailing = { Text("分钟/天", fontSize = 12.sp, color = c.ink3) })
+                AppSurface(modifier = Modifier.padding(bottom = 8.dp)) {
+                    TrendChart(trendMinutes, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp))
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { showCalendar = false }
-                            .padding(6.dp)
-                    ) { Text("取消", fontSize = 12.sp, color = colors.ink3) }
-                }
-                DatePicker(
-                    state = datePickerState,
-                    title = null,
-                    headline = null,
-                    colors = DatePickerDefaults.colors(
-                        todayDateBorderColor = Primary,
-                        selectedDayContainerColor = Primary,
-                        selectedDayContentColor = Color.White
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(end = 8.dp, bottom = 4.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Primary)
-                            .clickable {
-                                datePickerState.selectedDateMillis?.let { ms ->
-                                    val cal = Calendar.getInstance().apply {
-                                        firstDayOfWeek = Calendar.MONDAY; minimalDaysInFirstWeek = 4
-                                        timeInMillis = ms
-                                        set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-                                        set(Calendar.HOUR_OF_DAY, 0); clear(Calendar.MINUTE); clear(Calendar.SECOND); clear(Calendar.MILLISECOND)
-                                    }
-                                    weekMonday = cal.timeInMillis
-                                    showCalendar = false
-                                    appVm.showToast("已跳转到所选日期所在周")
-                                }
-                            }
-                            .padding(horizontal = 16.dp, vertical = 7.dp)
+                            .fillMaxWidth()
+                            .padding(start = 22.dp, end = 22.dp, bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("确定", fontSize = 12.sp, color = Color.White)
+                        val labels = if (rangeMode == 1) listOf("一", "二", "三", "四", "五", "六", "日")
+                        else listOf("6天前", "5天前", "4天前", "3天前", "前天", "昨天", "今天")
+                        labels.forEach { Text(it, fontSize = 10.5.sp, color = c.ink3) }
                     }
                 }
             }
         }
-    }
-}
+     } // end inner Column
 
-@Composable
-private fun RowScope.SummaryCell(label: String, value: String) {
-    val colors = LocalAppColors.current
-    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 11.sp, color = colors.ink3)
-        Spacer(Modifier.height(6.dp))
-        Text(value, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = colors.ink1)
-    }
-}
-
-@Composable
-private fun RowScope.SummaryCellColored(label: String, value: String, valueColor: Color) {
-    val colors = LocalAppColors.current
-    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 11.sp, color = colors.ink3)
-        Spacer(Modifier.height(6.dp))
-        Text(value, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = valueColor)
-    }
-}
-
-@Composable
-private fun RowScope.VDivider() {
-    val colors = LocalAppColors.current
-    Box(Modifier.width(1.dp).height(30.dp).background(colors.line))
-}
-
-@Composable
-private fun DonutChart(segments: List<Pair<Color, Float>>) {
-    val trackColor = Color(0xFFF0F2F5)
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val strokeWidth = 16.dp.toPx()
-        val diameter = min(size.width, size.height) - strokeWidth
-        val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
-        val arcSize = Size(diameter, diameter)
-        // Background track
-        drawArc(
-            color = trackColor,
-            startAngle = 0f,
-            sweepAngle = 360f,
-            useCenter = false,
-            topLeft = topLeft,
-            size = arcSize,
-            style = Stroke(width = strokeWidth)
+    // ---------- 日期选择 ----------
+    if (showCalendar) {
+        // 禁止选择未来日期（今天结束之前的时间戳均可选）
+        val todayEndMs = todayStart + TimeUnit.DAYS.toMillis(1) - 1
+        val dpState = rememberDatePickerState(
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                    utcTimeMillis <= todayEndMs
+            }
         )
-        // Segments (rotate -90 to start at top)
-        var start = -90f
-        segments.forEach { (color, pct) ->
-            val sweep = pct / 100f * 360f
-            drawArc(
-                color = color,
-                startAngle = start,
-                sweepAngle = sweep,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokeWidth)
-            )
-            start += sweep
-        }
-    }
-}
-
-@Composable
-private fun BarChart24h() {
-    val data = listOf(
-        10f to BehaviorLie, 8f to BehaviorLie, 6f to BehaviorLie, 5f to BehaviorLie,
-        6f to BehaviorLie, 8f to BehaviorLie, 25f to BehaviorSit, 45f to BehaviorWalk,
-        62f to BehaviorWalk, 78f to BehaviorSit, 85f to BehaviorSit, 72f to BehaviorSit,
-        60f to BehaviorWalk, 55f to BehaviorWalk, 68f to BehaviorSit, 80f to BehaviorSit,
-        88f to BehaviorSit, 76f to BehaviorSit, 70f to BehaviorWalk, 82f to BehaviorWalk,
-        90f to BehaviorWalk, 75f to BehaviorSit, 45f to BehaviorLie, 25f to BehaviorLie
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth().height(96.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        data.forEach { (heightPct, color) ->
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(heightPct / 100f)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(color)
-            )
-        }
-    }
-}
-
-@Composable
-private fun TrendChip(label: String, active: Boolean, activeColor: Color, onClick: () -> Unit) {
-    val colors = LocalAppColors.current
-    val bg = if (active) activeColor else colors.soft
-    val textColor = if (active) Color.White else colors.ink2
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(bg)
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 3.dp)
-    ) {
-        Text(label, fontSize = 11.sp, color = textColor)
-    }
-}
-
-@Composable
-private fun TrendLineChart(lineColor: Color) {
-    val points = listOf(
-        0.50f, 0.64f, 0.43f, 0.75f, 0.59f, 0.80f, 0.55f
-    )
-    Canvas(modifier = Modifier.fillMaxWidth().height(108.dp)) {
-        val w = size.width
-        val h = size.height
-        val n = points.size
-        val stepX = w / (n - 1)
-        val pts = points.mapIndexed { i, p ->
-            Offset(i * stepX, h - p * h * 0.8f - h * 0.1f)
-        }
-        // Fill area
-        val fillPath = Path().apply {
-            moveTo(pts[0].x, h)
-            pts.forEach { lineTo(it.x, it.y) }
-            lineTo(pts.last().x, h)
-            close()
-        }
-        drawPath(fillPath, color = lineColor.copy(alpha = 0.22f))
-        // Line
-        val linePath = Path().apply {
-            moveTo(pts[0].x, pts[0].y)
-            pts.drop(1).forEach { lineTo(it.x, it.y) }
-        }
-        drawPath(
-            linePath,
-            color = lineColor,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-        )
-        // Points
-        pts.forEachIndexed { i, p ->
-            val r = if (i == 5) 4.5f else 3f
-            drawCircle(Color.White, radius = r + 1f, center = p)
-            drawCircle(lineColor, radius = r, center = p, style = Stroke(width = 2f))
-        }
-    }
-}
-
-@Composable
-private fun HealthRow(iconBgColor: Color, emoji: String, title: String, desc: String) {
-    val colors = LocalAppColors.current
-    Row {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
-                .size(28.dp)
-                .background(iconBgColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
+                .matchParentSize()
+                .background(c.scrim)
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = { showCalendar = false }
+                )
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .clip(RoundedCornerShape(22.dp))
+                .background(c.elevated)
+                .padding(10.dp)
         ) {
-            Text(emoji, fontSize = 12.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("选择日期", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = c.ink)
+                Box(modifier = Modifier.tapScale { showCalendar = false }.padding(6.dp)) {
+                    Text("取消", fontSize = 12.sp, color = c.ink3)
+                }
+            }
+            DatePicker(
+                state = dpState,
+                title = null,
+                headline = null,
+                showModeToggle = false,
+                colors = DatePickerDefaults.colors(
+                    containerColor = c.elevated,
+                    todayDateBorderColor = c.blue,
+                    selectedDayContainerColor = c.blue,
+                    selectedDayContentColor = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(end = 8.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(c.blue)
+                        .tapScale {
+                            dpState.selectedDateMillis?.let { ms ->
+                                if (rangeMode == 0) {
+                                    anchorDay = Calendar.getInstance().apply {
+                                        timeInMillis = ms
+                                        set(Calendar.HOUR_OF_DAY, 0)
+                                        clear(Calendar.MINUTE); clear(Calendar.SECOND); clear(Calendar.MILLISECOND)
+                                    }.timeInMillis
+                                } else weekMonday = mondayOf(ms)
+                                showCalendar = false
+                                appVm.showToast("已跳转到所选日期所在${if (rangeMode == 0) "日" else "周"}")
+                            }
+                        }
+                        .padding(horizontal = 18.dp, vertical = 9.dp)
+                ) {
+                    Text("确定", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
+            }
         }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = colors.ink1)
-            Spacer(Modifier.height(2.dp))
-            Text(desc, fontSize = 12.sp, color = colors.ink2, lineHeight = 18.sp)
+        } // end centered overlay Box
+    }
+    } // end outer Box
+}
+
+@Composable
+private fun RowScope.StatCell(
+    label: String,
+    value: String,
+    suffix: String? = null,
+    tone: Color,
+    big: Boolean = true
+) {
+    val c = LocalAppColors.current
+    Column(
+        modifier = Modifier.weight(1f).padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        Text(label, fontSize = 11.5.sp, color = c.ink3)
+        Spacer(Modifier.height(7.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                value,
+                fontSize = if (big) 23.sp else 19.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = tone,
+                letterSpacing = (-0.4f).sp
+            )
+            if (suffix != null) {
+                Text(suffix, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = c.ink3,
+                    modifier = Modifier.padding(start = 5.dp, bottom = 2.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun DonutChart(segments: List<Pair<BehaviorType, Float>>, centerText: String) {
+    val c = LocalAppColors.current
+    Box(modifier = Modifier.size(132.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val strokeWidth = 15.dp.toPx()
+            val diameter = size.minDimension - strokeWidth
+            val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+            val arcSize = Size(diameter, diameter)
+            drawCircle(
+                color = c.surface2,
+                radius = diameter / 2f,
+                center = Offset(size.width / 2f, size.height / 2f),
+                style = Stroke(width = strokeWidth)
+            )
+            var start = -90f
+            segments.take(8).forEach { (type, pct) ->
+                val sweep = pct / 100f * 360f
+                drawArc(
+                    color = c.behavior(type),
+                    startAngle = start,
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidth)
+                )
+                start += sweep
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(centerText, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = c.green)
+            Text("活动达标率", fontSize = 10.5.sp, color = c.ink3, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
+
+@Composable
+private fun DonutLegend(segments: List<Pair<BehaviorType, Float>>, modifier: Modifier = Modifier) {
+    val c = LocalAppColors.current
+    // 前 4 类 + 其他
+    val top = segments.take(4)
+    val otherPct = segments.drop(4).sumOf { it.second.toDouble() }.toFloat()
+    val rows = top.toMutableList()
+    if (otherPct > 0.5f) rows.add(BehaviorType.SIT to otherPct) // 仅占位，颜色单独处理
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        rows.forEachIndexed { idx, (type, pct) ->
+            val isOther = idx >= 4
+            val dotColor = if (isOther) c.ink3 else c.behavior(type)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(RoundedCornerShape(3.dp)).background(dotColor))
+                Spacer(Modifier.width(8.dp))
+                Text(if (isOther) "其他" else type.label, fontSize = 12.5.sp, color = c.ink2)
+                Text(
+                    "%.0f%%".format(pct),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = c.ink,
+                    modifier = Modifier.weight(1f).padding(end = 2.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendChart(minutes: IntArray, modifier: Modifier = Modifier) {
+    val c = LocalAppColors.current
+    val maxV = (minutes.maxOrNull() ?: 0).coerceAtLeast(1)
+    val peakIdx = minutes.indexOf(minutes.maxOrNull() ?: 0)
+    Canvas(modifier = modifier.fillMaxWidth().height(150.dp)) {
+        val w = size.width
+        val h = size.height
+        val baseY = h - 30f
+        val topY = 12f
+        val n = minutes.size
+        val stepX = w / (n - 1)
+        fun px(i: Int) = if (n == 1) w / 2f else i * stepX
+        fun py(v: Int) = baseY - (v.toFloat() / maxV) * (baseY - topY)
+        val pts = minutes.indices.map { Offset(px(it), py(minutes[it])) }
+
+        // 底线
+        drawLine(c.rule, Offset(0f, baseY), Offset(w, baseY), strokeWidth = 1.dp.toPx())
+
+        // 渐变填充
+        val fill = Path().apply {
+            moveTo(pts.first().x, baseY)
+            pts.forEach { lineTo(it.x, it.y) }
+            lineTo(pts.last().x, baseY)
+            close()
+        }
+        drawPath(
+            fill,
+            brush = Brush.verticalGradient(
+                colors = listOf(c.blue.copy(alpha = 0.35f), c.blue.copy(alpha = 0f)),
+                startY = topY, endY = baseY
+            )
+        )
+        val line = Path().apply {
+            moveTo(pts.first().x, pts.first().y)
+            pts.drop(1).forEach { lineTo(it.x, it.y) }
+        }
+        drawPath(line, color = c.blue, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+        pts.forEachIndexed { i, p ->
+            val peak = i == peakIdx && minutes[i] > 0
+            drawCircle(if (peak) c.yellow else c.blue, radius = if (peak) 4.5.dp.toPx() else 3.5.dp.toPx(), center = p)
         }
     }
 }

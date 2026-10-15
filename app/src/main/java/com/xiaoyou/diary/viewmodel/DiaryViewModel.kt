@@ -48,7 +48,11 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         diaryText = text
     }
 
-    fun saveDiary(onToast: (String) -> Unit): Boolean {
+    /**
+     * 保存日记。
+     * @param tagTypes 用户在弹窗中勾选的行为标签（多选），如实落盘
+     */
+    fun saveDiary(tagTypes: Set<BehaviorType>, onToast: (String) -> Unit): Boolean {
         val text = diaryText.trim()
         if (text.isEmpty()) {
             onToast("请写点内容再保存")
@@ -59,12 +63,13 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         val newEntry = DiaryEntry(
             id = System.currentTimeMillis().toString(),
             date = SimpleDateFormat("M 月 d 日", Locale.getDefault()).format(now),
+            sortDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now),
             dateLabel = dateLabel,
             time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now),
             mood = selectedMood,
             moodEmoji = moods.first { it.first == selectedMood }.second,
             content = text,
-            tags = listOf(BehaviorType.WALK to "今日")
+            tags = tagTypes.map { it to it.label }
         )
         viewModelScope.launch { storage.insert(newEntry) }
         diaryText = ""
@@ -83,16 +88,25 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun dateLabel(date: Date): String {
-        val cal = Calendar.getInstance()
-        val today = Calendar.getInstance()
-        cal.time = date
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        return when (sdf.format(date)) {
-            sdf.format(today.time) -> "今天"
-            else -> {
-                val diff = (today.timeInMillis - cal.timeInMillis) / (1000 * 60 * 60 * 24)
-                if (diff == 1L) "昨天" else SimpleDateFormat("EEEE", Locale.CHINESE).format(date)
-            }
+        // 先把两个时刻都归一化到当地零点，再算自然日差值，
+        // 避免昨晚 23:30 与今天 00:30 因不足 24 小时被算成同一天
+        val today = Calendar.getInstance().apply { truncateToMidnight() }
+        val that = Calendar.getInstance().apply {
+            time = date
+            truncateToMidnight()
         }
+        val diffDays = (today.timeInMillis - that.timeInMillis) / (24L * 60 * 60 * 1000)
+        return when (diffDays) {
+            0L -> "今天"
+            1L -> "昨天"
+            else -> SimpleDateFormat("EEEE", Locale.CHINESE).format(date)
+        }
+    }
+
+    private fun Calendar.truncateToMidnight() {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
     }
 }

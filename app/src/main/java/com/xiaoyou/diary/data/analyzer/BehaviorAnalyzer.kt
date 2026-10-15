@@ -34,21 +34,12 @@ class BehaviorAnalyzer(
     private val magnitudeWindow = ArrayDeque<Float>()
     private val maxWindowSize = 50
 
-    // 最近一帧的传感器读数
-    private var lastUserAccel = FloatArray(3)
-    private var lastGyro = FloatArray(3)
-    private var lastGravity = FloatArray(3)
-
     fun update(
         userAccel: FloatArray,
         gyro: FloatArray,
         gravity: FloatArray,
         accelMagnitude: Float
     ): AnalysisResult {
-        lastUserAccel = userAccel
-        lastGyro = gyro
-        lastGravity = gravity
-
         // 更新滑动窗口
         magnitudeWindow.addLast(accelMagnitude)
         if (magnitudeWindow.size > maxWindowSize) magnitudeWindow.removeFirst()

@@ -17,15 +17,3 @@ data class BehaviorRecordEntity(
     val sessionId: String,
     val date: String
 )
-
-data class BehaviorStat(
-    val behaviorName: String,
-    val behaviorLabel: String,
-    val totalDuration: Long
-)
-
-data class HourlyStat(
-    val hour: String,
-    val behaviorName: String,
-    val cnt: Int
-)

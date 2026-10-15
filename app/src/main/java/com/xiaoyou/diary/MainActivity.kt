@@ -2,10 +2,12 @@ package com.xiaoyou.diary
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,17 +22,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xiaoyou.diary.ServiceLocator
 import com.xiaoyou.diary.ui.components.*
 import com.xiaoyou.diary.ui.screens.*
 import com.xiaoyou.diary.ui.theme.*
 import com.xiaoyou.diary.viewmodel.*
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +52,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 repository.reminderEvent.collectLatest { msg ->
                     if (!msg.isNullOrEmpty()) {
-                        appVm.showToast(msg)
+                        appVm.showToast(msg, ToastType.INFO)
                         repository.consumeReminder()
                     }
                 }
@@ -59,8 +63,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = LocalAppColors.current.bg
                 ) {
-                    // 顶部避让系统状态栏，避免与系统时间/电量重叠
-                    Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)) {
+                    Box(modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                    ) {
                         AppRoot(appVm, homeVm, settingsVm, diaryVm, analyzeVm)
                     }
                 }
@@ -98,18 +104,31 @@ private fun MainContent(
     analyzeVm: AnalyzeViewModel
 ) {
     val colors = LocalAppColors.current
-    // 液态玻璃模糊源：页面内容作为被模糊的底层，供底栏与玻璃按钮采样
-    val hazeState = remember { HazeState() }
-    // 横向滑动 Pager：五个 Tab 页左右滑动切换，驱动底部液态胶囊选中框
+    val scope = rememberCoroutineScope()
+    // 记录进入校准页前的页面，系统返回键按来源回退（设置页→设置，主页→主页）
+    var pageBeforeCalibrate by remember { mutableStateOf("home") }
+
+    // 系统返回键：二级页/日记弹窗消费返回事件回退，而不是直接退出 App
+    BackHandler(enabled = appVm.showDiarySheet) {
+        appVm.closeDiarySheet()
+    }
+    BackHandler(enabled = appVm.currentPage == "calibrate") {
+        appVm.navigateTo(pageBeforeCalibrate)
+    }
+    BackHandler(enabled = appVm.currentPage == "settings") {
+        appVm.setTab(appVm.currentTab)
+    }
+
     val pagerState = rememberPagerState(initialPage = appVm.currentTab.ordinal) {
         TabKey.entries.size
     }
+
     // Pager -> VM：滑动停稳后同步选中 Tab
     LaunchedEffect(pagerState.currentPage) {
         val tab = TabKey.entries[pagerState.currentPage]
         if (appVm.currentTab != tab) appVm.setTab(tab)
     }
-    // VM -> Pager：外部导航（如校准完成返回首页）以弹簧动画滚动过去
+    // VM -> Pager：外部导航以弹簧动画滚动（背景位移回弹纵深）
     LaunchedEffect(appVm.currentTab) {
         val target = appVm.currentTab.ordinal
         if (pagerState.currentPage != target) {
@@ -123,71 +142,122 @@ private fun MainContent(
         }
     }
 
+    // 弹窗弹出时背景缩小后推（scale .93）
+    val sheetOpen = appVm.showDiarySheet
+    val contentScale by animateFloatAsState(if (sheetOpen) 0.93f else 1f, label = "rootScale")
+    val contentRound by animateFloatAsState(if (sheetOpen) 38f else 0f, label = "rootRound")
+
     Box(modifier = Modifier.fillMaxSize().background(colors.bg)) {
-        // 页面主内容：作为液态玻璃的模糊源铺满全屏；底部留白让内容可滚动到底栏后方
+
+        // ---------- 主页面（4 Tab Pager） ----------
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .haze(hazeState)
-                .padding(bottom = 84.dp)
+                .graphicsLayer {
+                    scaleX = contentScale
+                    scaleY = contentScale
+                    shape = RoundedCornerShape(contentRound.dp.toPx())
+                    clip = contentRound > 0.5f
+                }
         ) {
             if (appVm.currentPage == "calibrate") {
                 CalibrateScreen(appVm) {
                     settingsVm.markCalibrated()
-                    appVm.showToast("校准完成 · 传感器零偏已更新")
-                    appVm.setTab(TabKey.HOME)
+                    appVm.showToast("校准完成 · 传感器零偏已更新", ToastType.OK)
+                    appVm.navigateTo(pageBeforeCalibrate)
                 }
+            } else if (appVm.currentPage == "settings") {
+                SettingsScreen(
+                    appVm = appVm,
+                    settingsVm = settingsVm,
+                    analyzeVm = analyzeVm,
+                    onCalibrate = {
+                        pageBeforeCalibrate = "settings"
+                        appVm.navigateTo("calibrate")
+                    },
+                    onBack = { appVm.setTab(appVm.currentTab) }
+                )
             } else {
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize()
                 ) { page ->
                     when (TabKey.entries[page]) {
-                        TabKey.HOME -> HomeScreen(appVm, homeVm, hazeState) { appVm.navigateTo("calibrate") }
+                        TabKey.HOME -> HomeScreen(
+                            appVm = appVm,
+                            homeVm = homeVm,
+                            onCalibrate = {
+                                pageBeforeCalibrate = "home"
+                                appVm.navigateTo("calibrate")
+                            },
+                            onSettings = { appVm.navigateTo("settings") }
+                        )
                         TabKey.ANALYZE -> AnalyzeScreen(appVm, analyzeVm)
                         TabKey.DIARY -> DiaryScreen(appVm, diaryVm, analyzeVm)
                         TabKey.HISTORY -> HistoryScreen(appVm, analyzeVm)
-                        TabKey.SETTINGS -> SettingsScreen(appVm, settingsVm, analyzeVm) { appVm.navigateTo("calibrate") }
                     }
                 }
+
+                // 悬浮胶囊导航 + FAB（二级页隐藏）
+                Dock(
+                    current = appVm.currentTab,
+                    detecting = homeVm.isDetecting,
+                    onTab = { tab ->
+                        scope.launch {
+                            pagerState.animateScrollToPage(
+                                tab.ordinal,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
+                        }
+                    },
+                    onFab = {
+                        // 非主页只切回主页，不在同一次点击里顺带启停检测，避免交互混乱
+                        if (appVm.currentTab != TabKey.HOME) {
+                            appVm.setTab(TabKey.HOME)
+                        } else {
+                            homeVm.toggleDetection { msg ->
+                                appVm.showToast(
+                                    msg,
+                                    if (homeVm.isDetecting) ToastType.INFO else ToastType.OK
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
         }
 
-        // 液态玻璃底部导航：悬浮在内容上层，内容透过玻璃产生真实模糊
-        if (appVm.currentPage != "calibrate") {
-            TabBar(
-                pagerState = pagerState,
-                hazeState = hazeState,
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
-        }
+        // ---------- Toast ----------
+        ToastHost(toast = appVm.toast, onDismiss = { appVm.dismissToast() })
 
-        // Toast overlay
-        ToastHost(
-            toast = appVm.toast,
-            onDismiss = { appVm.dismissToast() }
-        )
-
-        // Confirm dialog overlay
+        // ---------- 确认对话框 ----------
         if (appVm.showConfirm) {
             ConfirmDialog(appVm)
         }
 
-        // Diary bottom sheet overlay
-        if (appVm.showDiarySheet) {
+        // ---------- 日记底部弹窗（背景缩放 + 底部滑入） ----------
+        AnimatedVisibility(
+            visible = appVm.showDiarySheet,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0x80101828))
+                    .background(Color(0x73000000))
             )
-            AnimatedVisibility(
-                visible = appVm.showDiarySheet,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it }),
-                modifier = Modifier.align(Alignment.BottomCenter)
-            ) {
-                DiarySheet(appVm, diaryVm)
-            }
+        }
+        AnimatedVisibility(
+            visible = appVm.showDiarySheet,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            DiarySheet(appVm, diaryVm)
         }
     }
 }

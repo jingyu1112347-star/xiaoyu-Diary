@@ -1,66 +1,40 @@
 package com.xiaoyou.diary.viewmodel
 
 import android.app.Application
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xiaoyou.diary.ServiceLocator
-import com.xiaoyou.diary.data.db.BehaviorStat
-import com.xiaoyou.diary.data.db.HourlyStat
 import com.xiaoyou.diary.data.repository.BehaviorRepository
 import com.xiaoyou.diary.model.BehaviorType
 import com.xiaoyou.diary.model.HistorySession
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 class AnalyzeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository: BehaviorRepository = ServiceLocator.provideRepository(app)
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-    /** 全部记录（响应式，数据库变化自动更新） */
+    /** 全部记录（响应式，存储层变化自动更新） */
     val allRecords = repository.allRecords
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    /** 行为统计（最近7天） */
-    var behaviorStats by mutableStateOf<List<BehaviorStat>>(emptyList())
-        private set
-
-    /** 24小时分布 */
-    var hourlyStats by mutableStateOf<List<HourlyStat>>(emptyList())
-        private set
-
-    /** 历史会话（用于History页） */
+    /** 历史会话（用于History页），按会话开始时间倒序 */
     val sessions: StateFlow<List<HistorySession>> = repository.allRecords
         .map { records -> buildSessions(records) }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    init {
-        refresh()
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            val sevenDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7)
-            behaviorStats = repository.getBehaviorStatsSince(sevenDaysAgo)
-            hourlyStats = repository.getHourlyDistribution(dateFormat.format(Date()))
-        }
-    }
-
     fun clearAll(onDone: () -> Unit) {
         viewModelScope.launch {
             repository.clearAllData()
-            refresh()
             onDone()
         }
     }
@@ -68,19 +42,27 @@ class AnalyzeViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteSessions(sessionIds: Set<String>, onDone: () -> Unit) {
         viewModelScope.launch {
             repository.deleteBySessionIds(sessionIds)
-            refresh()
             onDone()
         }
     }
 
-    /** 导出数据到外部存储并通过系统分享 */
+    /** 导出数据到外部存储并通过系统分享。序列化与写盘放在 IO 线程，避免主线程卡顿 */
     fun exportData(context: android.content.Context, onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {
-                val json = repository.exportJson()
-                val dir = context.getExternalFilesDir(null) ?: context.filesDir
-                val file = java.io.File(dir, "xiaoyou_records_${System.currentTimeMillis()}.json")
-                file.writeText(json)
+                val file = withContext(Dispatchers.IO) {
+                    val json = repository.exportJson()
+                    val dir = context.getExternalFilesDir(null) ?: context.filesDir
+                    val target = java.io.File(dir, "xiaoyou_records_${System.currentTimeMillis()}.json")
+                    // 原子写：先写临时文件再改名
+                    val tmp = java.io.File(dir, "xiaoyou_records.tmp")
+                    tmp.writeText(json)
+                    if (!tmp.renameTo(target)) {
+                        tmp.copyTo(target, overwrite = true)
+                        tmp.delete()
+                    }
+                    target
+                }
                 // 分享文件
                 val uri = androidx.core.content.FileProvider.getUriForFile(
                     context, "${context.packageName}.fileprovider", file
@@ -98,11 +80,44 @@ class AnalyzeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 导出单个会话的记录并通过系统分享；写盘放在 IO 线程，避免主线程卡顿 */
+    fun exportSession(context: android.content.Context, sessionId: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val records = repository.allRecords.value.filter { it.sessionId == sessionId }
+                    val json = com.google.gson.Gson().toJson(records)
+                    val dir = context.getExternalFilesDir(null) ?: context.filesDir
+                    val target = java.io.File(dir, "xiaoyou_session_${System.currentTimeMillis()}.json")
+                    // 原子写：先写临时文件再改名
+                    val tmp = java.io.File(dir, "xiaoyou_session.tmp")
+                    tmp.writeText(json)
+                    if (!tmp.renameTo(target)) {
+                        tmp.copyTo(target, overwrite = true)
+                        tmp.delete()
+                    }
+                    target
+                }
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", file
+                )
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/json"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(android.content.Intent.createChooser(intent, "导出会话数据").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                onResult(true, file.absolutePath)
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "导出失败")
+            }
+        }
+    }
+
     /** 导入 JSON 数据 */
     fun importJson(json: String, onResult: (Int) -> Unit) {
         viewModelScope.launch {
             val count = repository.importJson(json)
-            refresh()
             onResult(count)
         }
     }
@@ -127,16 +142,26 @@ class AnalyzeViewModel(app: Application) : AndroidViewModel(app) {
                 type to (dur.toFloat() / totalSec.coerceAtLeast(1) * 100f)
             }.sortedByDescending { it.second }
 
+            // 真实切换次数：按时间排序后相邻分段行为发生变化的次数
+            var switches = 0
+            for (i in 1 until sorted.size) {
+                if (sorted[i].behaviorName != sorted[i - 1].behaviorName) switches++
+            }
+
             HistorySession(
                 id = sessionId,
                 startTime = timeFormat.format(Date(first.startTimeMs)),
                 endTime = timeFormat.format(Date(last.endTimeMs)),
                 primaryBehavior = try { BehaviorType.valueOf(primaryName) } catch (_: Exception) { BehaviorType.SIT },
-                switchCount = sorted.map { it.behaviorName }.distinct().size,
+                switchCount = switches,
                 totalDuration = formatDuration(totalSec),
-                segments = segments
+                segments = segments,
+                startMs = first.startTimeMs
             )
-        }.sortedByDescending { it.id }
+        }.sortedByDescending { session ->
+            // 按会话真实开始时间倒序（id 是随机 UUID，不能用于排序）
+            session.startMs
+        }
     }
 
     private fun formatDuration(totalSec: Int): String {

@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.xiaoyou.diary.ServiceLocator
 import com.xiaoyou.diary.ui.components.TabKey
 import com.xiaoyou.diary.ui.components.ToastState
+import com.xiaoyou.diary.ui.components.ToastType
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -61,8 +62,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         currentPage = page
     }
 
-    fun showToast(text: String) {
-        toast = ToastState(text)
+    fun showToast(text: String, type: ToastType = ToastType.OK) {
+        toast = ToastState(text = text, type = type)
     }
 
     fun dismissToast() {

@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小幽日记 XiaoYou Diary · UI Design Board</title>
+<style>
+/* ============================================================
+   小幽日记 — Figma 风格高保真设计画板
+   深色优先 / Apple HIG / 单列纵向流 / 无 backdrop-filter
+   ============================================================ */
+*{ margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+:root{
+  /* ---- 画板（Figma canvas，恒定深色） ---- */
+  --board:#0B0D10; --board2:#111419; --board-ink:#E8ECF2; --board-muted:#7C8595;
+  --frame-line:rgba(255,255,255,.07);
+
+  /* ---- 手机：深色主题（默认） ---- */
+  --bg:#0C0E11; --surface:#161A21; --surface2:#1C212A; --elevated:#242B36;
+  --tab-active:#2C333F;
+  --ink:#F3F6FA; --ink2:#A6AEBD; --ink3:#6E7686;
+  --rule:rgba(255,255,255,.075); --rule2:rgba(255,255,255,.13);
+  --blue:#2F8AF5; --blue-soft:rgba(47,138,245,.16);
+  --yellow:#F7C948; --yellow-soft:rgba(247,201,72,.14);
+  --purple:#B46CF0; --purple-soft:rgba(180,108,240,.18);
+  --red:#FF5A5F; --red-soft:rgba(255,90,95,.16);
+  --green:#34C759; --green-soft:rgba(52,199,89,.16);
+  --orange:#FF9F0A; --cyan:#5AC8FA; --pink:#FF375F;
+  --fab-shadow:0 12px 28px -8px rgba(47,138,245,.65);
+  --dock-shadow:0 18px 40px -12px rgba(0,0,0,.75);
+}
+body.light{
+  --bg:#F1F2F5; --surface:#FFFFFF; --surface2:#F6F8FB; --elevated:#FFFFFF;
+  --tab-active:#15181F;
+  --ink:#12161D; --ink2:#4B5361; --ink3:#8B93A1;
+  --rule:rgba(17,20,25,.08); --rule2:rgba(17,20,25,.14);
+  --blue:#0A6FE6; --blue-soft:rgba(10,111,230,.10);
+  --yellow:#D19200; --yellow-soft:rgba(209,146,0,.12);
+  --purple:#9B44DC; --purple-soft:rgba(155,68,220,.12);
+  --red:#E5302B; --red-soft:rgba(229,48,43,.10);
+  --green:#1F9D44; --green-soft:rgba(31,157,68,.12);
+  --orange:#E8860A;
+  --dock-shadow:0 18px 40px -14px rgba(20,30,50,.35);
+}
+
+html,body{ height:100%; }
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Helvetica Neue','Microsoft YaHei',sans-serif;
+  background:var(--board); color:var(--board-ink);
+  overflow:auto;
+}
+.num{ font-variant-numeric:tabular-nums; font-feature-settings:"tnum"; }
+button{ font:inherit; color:inherit; background:none; border:none; cursor:pointer; padding:0;
+  -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+
+/* ============ 画板顶部工具条 ============ */
+.board-bar{
+  position:sticky; top:0; z-index:200; height:60px; display:flex; align-items:center; gap:14px;
+  padding:0 28px; background:rgba(11,13,16,.92); border-bottom:1px solid var(--frame-line);
+}
+.brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px; letter-spacing:.2px; }
+.brand .logo-dot{ width:22px; height:22px; border-radius:7px;
+  background:conic-gradient(from 200deg,#2F8AF5,#B46CF0,#34C759,#F7C948,#2F8AF5); }
+.brand small{ color:var(--board-muted); font-weight:500; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;}
+.board-chips{ display:flex; gap:8px; margin-left:8px; }
+.chip{ font-size:11.5px; color:#B7BFCB; border:1px solid var(--frame-line); padding:5px 11px; border-radius:999px;
+  background:rgba(255,255,255,.03); white-space:nowrap; }
+.board-bar .spacer{ flex:1; }
+.board-btn{ min-height:38px; padding:0 16px; border-radius:999px; font-size:13px; font-weight:600;
+  background:#1A1E25; color:#DDE3EC; border:1px solid var(--frame-line); display:flex; align-items:center; gap:7px; }
+.board-btn.primary{ background:#2F8AF5; border-color:transparent; color:#fff; }
+.board-hint{ font-size:11.5px; color:var(--board-muted); }
+
+/* ============ 画板布局 ============ */
+.canvas{ display:flex; gap:64px; padding:48px 60px 120px; align-items:flex-start; }
+.frame{ flex:none; }
+.frame-caption{ display:flex; align-items:baseline; gap:10px; margin:0 6px 18px; }
+.frame-no{ font-size:11px; font-weight:700; color:#2F8AF5; letter-spacing:2px; }
+.frame-title{ font-size:15px; font-weight:700; color:#E8ECF2; }
+.frame-sub{ font-size:11.5px; color:#7C8595; }
+
+/* ============ 设备外框 ============ */
+.device{
+  width:402px; height:874px; padding:9px; border-radius:54px; position:relative;
+  background:linear-gradient(150deg,#3A3E46,#0E1013 55%,#26292F);
+  box-shadow:0 50px 100px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.07) inset;
+}
+.screen{
+  position:relative; width:100%; height:100%; border-radius:46px; overflow:hidden;
+  background:var(--bg); color:var(--ink);
+  transition:background .35s ease, color .35s ease;
+}
+.island{ position:absolute; top:13px; left:50%; transform:translateX(-50%); width:118px; height:32px;
+  border-radius:18px; background:#000; z-index:60; }
+
+/* ---- 应用层（弹窗时整体缩放） ---- */
+.app-root{ position:absolute; inset:0; display:flex; flex-direction:column;
+  background:var(--bg); transform-origin:50% 100%;
+  transition:transform .38s cubic-bezier(.32,.72,0,1), border-radius .38s ease; }
+.screen.scaled .app-root{ transform:scale(.93) translateY(-2.2%); border-radius:38px; }
+@keyframes tabBounce{
+  0%{ transform:translateX(0); }
+  38%{ transform:translateX(35%); }
+  68%{ transform:translateX(-7%); }
+  100%{ transform:translateX(0); }
+}
+.app-root.bounce{ animation:tabBounce .42s cubic-bezier(.32,.9,.3,1); }
+
+/* ---- 状态栏 9:41 ---- */
+.statusbar{ flex:none; height:54px; display:flex; align-items:flex-end; justify-content:space-between;
+  padding:0 30px 7px; font-size:15px; font-weight:600; }
+.sb-right{ display:flex; align-items:center; gap:7px; }
+.sb-right svg{ display:block; }
+
+/* ---- 导航栏 ---- */
+.navbar{ flex:none; min-height:56px; display:flex; align-items:center; justify-content:space-between;
+  padding:6px 20px 8px; gap:12px; }
+.nav-title{ display:flex; flex-direction:column; gap:2px; }
+.nav-title h1{ font-size:32px; line-height:1.1; font-weight:800; letter-spacing:-.5px; }
+.nav-title .sub{ font-size:12.5px; color:var(--ink3); }
+.nav-title.center{ text-align:center; }
+.nav-title.center h1{ font-size:18px; font-weight:700; letter-spacing:0; }
+.icon-cap{
+  min-width:44px; height:44px; padding:0 12px; display:flex; align-items:center; justify-content:center; gap:7px;
+  border-radius:999px; background:var(--surface); border:1px solid var(--rule);
+}
+.icon-cap.tight{ padding:0; width:44px; }
+.icon-cap svg{ width:19px; height:19px; stroke:var(--ink2); fill:none; stroke-width:1.9; }
+.round-btn{ width:44px; height:44px; border-radius:50%; background:var(--surface);
+  border:1px solid var(--rule); display:flex; align-items:center; justify-content:center; flex:none; }
+.round-btn svg{ width:18px; height:18px; stroke:var(--ink); fill:none; stroke-width:2.1; }
+
+/* ---- 内容滚动 ---- */
+.content{ flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; padding:6px 20px 130px; }
+.content::-webkit-scrollbar{ display:none; }
+
+/* ---- 区块/分组标题 ---- */
+.group{ margin:26px 0 0; }
+.group:first-child{ margin-top:8px; }
+.group-head{ display:flex; align-items:center; justify-content:space-between; margin:0 2px 11px; }
+.group-head .g-label{ font-size:11px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; }
+.g-label.accent{ color:var(--blue); }
+.g-label.gray{ color:var(--ink3); }
+.group-head .g-more{ display:flex; align-items:center; gap:3px; font-size:12px; color:var(--ink3);
+  min-height:32px; padding:0 6px; }
+.g-more svg{ width:13px; height:13px; stroke:var(--ink3); fill:none; stroke-width:2.2; }
+.rule-line{ height:1px; background:var(--rule); margin:0 2px 12px; }
+
+/* ---- 表面容器（单层卡片，禁止嵌套） ---- */
+.surface{ background:var(--surface); border:1px solid var(--rule); border-radius:22px; }
+.surface.flush{ border-radius:0; border-left:none; border-right:none; background:transparent; }
+.pad{ padding:18px; }
+.row-divider{ height:1px; background:var(--rule); margin:0 18px; }
+
+/* ============ 概览：实时行为大卡 ============ */
+.hero{ padding:20px; position:relative; overflow:hidden; }
+.hero-top{ display:flex; align-items:center; justify-content:space-between; }
+.badge{ display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 11px; border-radius:999px;
+  font-size:11.5px; font-weight:600; }
+.badge .dot{ width:6px; height:6px; border-radius:50%; }
+.badge.purple{ background:var(--purple-soft); color:var(--purple); }
+.badge.purple .dot{ background:var(--purple); animation:pulse 1.3s infinite; }
+.badge.green{ background:var(--green-soft); color:var(--green); }
+.badge.green .dot{ background:var(--green); }
+@keyframes pulse{ 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.45; transform:scale(.8);} }
+.meta-fs{ font-size:11px; color:var(--ink3); display:flex; align-items:center; gap:5px; }
+.meta-fs svg{ width:12px; height:12px; stroke:var(--ink3); fill:none; stroke-width:2; }
+
+.hero-main{ display:flex; align-items:flex-end; justify-content:space-between; margin:18px 0 6px; }
+.hero-behavior{ font-size:42px; font-weight:800; letter-spacing:-1px; color:var(--yellow); line-height:1; }
+.hero-conf{ text-align:right; }
+.hero-conf .pct{ font-size:40px; font-weight:800; color:var(--blue); letter-spacing:-1px; line-height:1; }
+.hero-conf .pct-label{ font-size:11px; color:var(--ink3); margin-top:5px; letter-spacing:.5px; }
+.hero-sub{ display:flex; gap:16px; font-size:12.5px; color:var(--ink2); margin-top:12px; }
+.hero-sub b{ color:var(--ink); font-weight:600; }
+
+.wave{ margin-top:16px; height:40px; width:100%; }
+.wave path{ fill:none; stroke:var(--blue); stroke-width:1.8; opacity:.85; stroke-linejoin:round; }
+
+/* 停止空态 */
+.hero-stopped{ text-align:center; padding:26px 10px 20px; }
+.hero-stopped .illus{ width:58px; height:58px; margin:0 auto 12px; border-radius:50%;
+  background:var(--surface2); display:flex; align-items:center; justify-content:center; }
+.hero-stopped .illus svg{ width:26px; height:26px; stroke:var(--ink3); fill:none; stroke-width:1.8; }
+.hero-stopped h3{ font-size:16px; font-weight:700; margin-bottom:5px; }
+.hero-stopped p{ font-size:12.5px; color:var(--ink3); line-height:1.6; }
+
+/* ============ 姿态参数 ============ */
+.pose-grid{ display:flex; }
+.pose-cell{ flex:1; text-align:center; padding:4px 0; }
+.pose-cell + .pose-cell{ border-left:1px solid var(--rule); }
+.pose-cell .k{ font-size:11px; color:var(--ink3); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:8px; }
+.pose-cell .v{ font-size:24px; font-weight:700; letter-spacing:-.4px; }
+.pose-cell .v small{ font-size:12px; font-weight:600; color:var(--ink3); margin-left:1px; }
+.pose-axis{ width:52px; height:4px; border-radius:2px; background:var(--surface2); margin:9px auto 0; position:relative; overflow:hidden; }
+.pose-axis i{ position:absolute; top:0; bottom:0; left:50%; width:2px; background:var(--ink3); }
+.pose-axis b{ position:absolute; top:-2px; width:3px; height:8px; border-radius:2px; background:var(--blue); }
+
+/* ============ 概率排名 ============ */
+.prob-list{ padding:4px 18px; }
+.prob-row{ display:flex; align-items:center; gap:12px; height:52px; position:relative; }
+.prob-row::before{ content:""; position:absolute; left:-18px; top:11px; bottom:11px; width:4px; border-radius:0 3px 3px 0; }
+.prob-row.c-walk::before{ background:var(--green); }
+.prob-row.c-jog::before{ background:var(--yellow); }
+.prob-row.c-run::before{ background:var(--red); }
+.prob-row.c-sit::before{ background:var(--blue); }
+.prob-row.c-stand::before{ background:var(--purple); }
+.prob-row.c-tilt::before{ background:var(--orange); }
+.prob-row.c-lie::before{ background:var(--cyan); }
+.prob-row.c-side::before{ background:var(--pink); }
+.prob-name{ font-size:14px; font-weight:600; width:42px; flex:none; }
+.prob-row.is-top .prob-name{ color:var(--yellow); }
+.prob-track{ flex:1; height:7px; border-radius:4px; background:var(--surface2); overflow:hidden; }
+.prob-fill{ height:100%; border-radius:4px; transition:width .5s cubic-bezier(.32,.72,0,1); }
+.prob-row.c-walk .prob-fill{ background:var(--green); }
+.prob-row.c-jog .prob-fill{ background:var(--yellow); }
+.prob-row.c-run .prob-fill{ background:var(--red); }
+.prob-row.c-sit .prob-fill{ background:var(--blue); }
+.prob-row.c-stand .prob-fill{ background:var(--purple); }
+.prob-row.c-tilt .prob-fill{ background:var(--orange); }
+.prob-row.c-lie .prob-fill{ background:var(--cyan); }
+.prob-row.c-side .prob-fill{ background:var(--pink); }
+.prob-val{ width:44px; text-align:right; font-size:13px; font-weight:600; color:var(--ink2); flex:none; }
+.prob-row.is-top .prob-val{ color:var(--blue); }
+
+/* ============ 快捷操作 ============ */
+.action-list{ padding:2px 0; }
+.action-row{ width:100%; min-height:56px; display:flex; align-items:center; gap:14px; padding:0 18px; text-align:left; }
+.action-row .a-ico{ width:34px; height:34px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex:none; }
+.action-row .a-ico svg{ width:17px; height:17px; fill:none; stroke-width:2; }
+.action-row .a-txt{ flex:1; }
+.action-row .a-txt b{ display:block; font-size:14.5px; font-weight:600; }
+.action-row .a-txt span{ display:block; font-size:11.5px; color:var(--ink3); margin-top:2px; }
+.action-row .a-go{ width:14px; height:14px; stroke:var(--ink3); fill:none; stroke-width:2.2; }
+.action-row.primary .a-ico{ background:var(--blue-soft); }
+.action-row.primary .a-ico svg{ stroke:var(--blue); }
+.action-row.danger .a-ico{ background:var(--red-soft); }
+.action-row.danger .a-ico svg{ stroke:var(--red); }
+.action-row.neutral .a-ico{ background:var(--surface2); }
+.action-row.neutral .a-ico svg{ stroke:var(--ink2); }
+.action-row:disabled{ opacity:.4; }
+
+/* ============ 数据分析 ============ */
+.segment{ display:flex; background:var(--surface2); border-radius:12px; padding:3px; }
+.segment button{ flex:1; min-height:38px; border-radius:9px; font-size:13px; font-weight:600; color:var(--ink3);
+  display:flex; align-items:center; justify-content:center; gap:6px; transition:all .25s; }
+.segment button.on{ background:var(--elevated); color:var(--ink); box-shadow:0 2px 8px rgba(0,0,0,.25); }
+
+.week-nav{ display:flex; align-items:center; justify-content:space-between; margin:14px 0 4px; }
+.week-nav .wn-btn{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; }
+.week-nav .wn-btn svg{ width:17px; height:17px; stroke:var(--ink2); fill:none; stroke-width:2.2; }
+.week-nav .wn-btn.off{ opacity:.28; }
+.week-nav .wn-center{ text-align:center; }
+.week-nav .wn-center .w1{ font-size:14px; font-weight:700; display:flex; align-items:center; gap:7px; justify-content:center; }
+.week-nav .wn-center .w2{ font-size:11.5px; color:var(--ink3); margin-top:3px; }
+.tag-week{ font-size:10px; font-weight:700; color:var(--green); background:var(--green-soft);
+  padding:2px 7px; border-radius:999px; }
+
+.stat-grid{ display:flex; flex-wrap:wrap; }
+.stat{ width:50%; padding:16px 18px; }
+.stat:nth-child(odd){ border-right:1px solid var(--rule); }
+.stat:nth-child(n+3){ border-top:1px solid var(--rule); }
+.stat .k{ font-size:11.5px; color:var(--ink3); margin-bottom:7px; }
+.stat .v{ font-size:23px; font-weight:800; letter-spacing:-.4px; display:flex; align-items:baseline; gap:5px; }
+.stat .v small{ font-size:12px; font-weight:600; color:var(--ink3); }
+.stat.s-yellow .v{ color:var(--yellow); }
+.stat.s-blue .v{ color:var(--blue); }
+.stat.s-purple .v{ color:var(--purple); }
+.stat.s-green .v{ color:var(--green); }
+
+/* 环形图 */
+.donut-wrap{ display:flex; align-items:center; gap:20px; padding:20px 18px 8px; }
+.donut{ position:relative; width:132px; height:132px; flex:none; }
+.donut svg{ transform:rotate(-90deg); }
+.donut .dc{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.donut .dc b{ font-size:26px; font-weight:800; color:var(--green); }
+.donut .dc span{ font-size:10.5px; color:var(--ink3); margin-top:2px; }
+.legend{ flex:1; display:flex; flex-direction:column; gap:9px; }
+.lg-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.lg-row i{ width:8px; height:8px; border-radius:3px; flex:none; }
+.lg-row span{ color:var(--ink2); }
+.lg-row b{ margin-left:auto; font-weight:700; font-size:12.5px; }
+
+/* 24h 柱状（横向滚动） */
+.hscroll{ overflow-x:auto; overflow-y:hidden; scrollbar-width:none; padding:4px 18px 14px; }
+.hscroll::-webkit-scrollbar{ display:none; }
+.bars24{ display:flex; align-items:flex-end; gap:6px; height:120px; position:relative; min-width:560px; }
+.bar24{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
+.bar24 i{ width:100%; max-width:14px; border-radius:4px 4px 2px 2px; background:var(--blue); opacity:.85;
+  transition:height .5s ease; }
+.bar24 i.peak{ background:var(--yellow); }
+.bar24 em{ font-size:9px; color:var(--ink3); font-style:normal; }
+
+/* 周趋势折线 */
+.trend{ padding:6px 14px 14px; }
+.trend svg{ width:100%; height:150px; display:block; }
+.trend-x{ display:flex; justify-content:space-between; padding:2px 14px 0; font-size:10.5px; color:var(--ink3); }
+
+/* ============ 日记 ============ */
+.day-summary{ padding:6px 18px; }
+.ds-row{ min-height:56px; display:flex; align-items:center; gap:12px; }
+.ds-row .ds-ico{ width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex:none; }
+.ds-row .ds-ico svg{ width:15px; height:15px; fill:none; stroke-width:2; }
+.ds-row .ds-main{ flex:1; }
+.ds-row .ds-main b{ font-size:13.5px; display:block; }
+.ds-row .ds-main .ds-bar{ height:5px; border-radius:3px; background:var(--surface2); margin-top:7px; overflow:hidden; }
+.ds-row .ds-main .ds-bar i{ display:block; height:100%; border-radius:3px; }
+.ds-row .ds-v{ font-size:14px; font-weight:700; width:62px; text-align:right; }
+.ds-walk .ds-ico{ background:var(--green-soft);} .ds-walk .ds-ico svg{ stroke:var(--green);} .ds-walk .ds-bar i{ background:var(--green);} .ds-walk .ds-v{color:var(--green);}
+.ds-sit .ds-ico{ background:var(--blue-soft);} .ds-sit .ds-ico svg{ stroke:var(--blue);} .ds-sit .ds-bar i{ background:var(--blue);} .ds-sit .ds-v{color:var(--blue);}
+.ds-stand .ds-ico{ background:var(--purple-soft);} .ds-stand .ds-ico svg{ stroke:var(--purple);} .ds-stand .ds-bar i{ background:var(--purple);} .ds-stand .ds-v{color:var(--purple);}
+
+/* 心情 */
+.moods{ display:flex; justify-content:space-between; padding:6px 8px 2px; }
+.mood{ width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:24px; border:2px solid transparent; background:var(--surface2); transition:all .25s; }
+.mood.on{ border-color:var(--yellow); background:var(--yellow-soft); transform:scale(1.08); }
+
+/* 日记条目 */
+.diary-item{ padding:16px 18px; }
+.di-meta{ font-size:11px; color:var(--ink3); display:flex; align-items:center; gap:7px; }
+.di-title{ font-size:16px; font-weight:700; margin:7px 0 5px; }
+.di-text{ font-size:13px; color:var(--ink2); line-height:1.65;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; position:relative; }
+.di-tags{ display:flex; gap:7px; margin-top:11px; }
+.tag{ font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px; }
+.tag.t-walk{ background:var(--green-soft); color:var(--green); }
+.tag.t-sit{ background:var(--blue-soft); color:var(--blue); }
+.tag.t-stand{ background:var(--purple-soft); color:var(--purple); }
+
+.btn-full{ width:100%; min-height:52px; border-radius:16px; font-size:15px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; gap:8px; margin-top:14px;
+  background:var(--blue); color:#fff; box-shadow:0 10px 24px -10px rgba(47,138,245,.7); }
+.btn-full svg{ width:17px; height:17px; stroke:#fff; fill:none; stroke-width:2.2; }
+
+/* ============ 历史记录 ============ */
+.session{ display:flex; align-items:center; gap:13px; min-height:76px; padding:14px 18px 14px 14px;
+  position:relative; width:100%; text-align:left; }
+.session::before{ content:""; position:absolute; left:0; top:16px; bottom:16px; width:4px; border-radius:0 3px 3px 0; }
+.session.m-walk::before{ background:var(--green); }
+.session.m-jog::before{ background:var(--yellow); }
+.session.m-sit::before{ background:var(--blue); }
+.session.m-stand::before{ background:var(--purple); }
+.session.today{ background:var(--blue-soft); }
+.s-main{ flex:1; min-width:0; }
+.s-time{ font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.s-time .live-dot{ width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 1.3s infinite; }
+.s-desc{ font-size:12px; color:var(--ink2); margin-top:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.s-desc .sep{ color:var(--ink3); }
+.s-dur{ text-align:right; flex:none; }
+.s-dur b{ font-size:17px; font-weight:800; color:var(--ink); }
+.s-dur span{ display:block; font-size:10.5px; color:var(--ink3); margin-top:2px; }
+.session svg.s-chev{ width:14px; height:14px; stroke:var(--ink3); fill:none; stroke-width:2.2; flex:none; }
+
+/* ============ 设置 ============ */
+.set-row{ min-height:56px; display:flex; align-items:center; gap:13px; padding:0 18px; width:100%; text-align:left; }
+.set-row .st-ico{ width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex:none; }
+.set-row .st-ico svg{ width:16px; height:16px; fill:none; stroke-width:2; }
+.set-row .st-main{ flex:1; }
+.set-row .st-main b{ font-size:14px; display:block; }
+.set-row .st-main span{ font-size:11.5px; color:var(--ink3); display:block; margin-top:2px; }
+.set-row .st-val{ font-size:13px; font-weight:700; color:var(--blue); display:flex; align-items:center; gap:5px; }
+.set-row .st-val svg{ width:13px; height:13px; stroke:var(--ink3); fill:none; stroke-width:2.4; }
+.set-row.danger-text .st-main b{ color:var(--red); }
+.i-blue{ background:var(--blue-soft);} .i-blue svg{ stroke:var(--blue);}
+.i-purple{ background:var(--purple-soft);} .i-purple svg{ stroke:var(--purple);}
+.i-green{ background:var(--green-soft);} .i-green svg{ stroke:var(--green);}
+.i-yellow{ background:var(--yellow-soft);} .i-yellow svg{ stroke:var(--yellow);}
+.i-red{ background:var(--red-soft);} .i-red svg{ stroke:var(--red);}
+.i-gray{ background:var(--surface2);} .i-gray svg{ stroke:var(--ink2);}
+
+/* 滑块 */
+.slider-row{ padding:12px 18px 16px; }
+.slider-row .sl-top{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink2); margin-bottom:10px; }
+.slider-row .sl-top b{ color:var(--ink); }
+input[type=range]{ -webkit-appearance:none; width:100%; height:4px; border-radius:2px;
+  background:linear-gradient(to right,var(--blue) var(--fill,50%),var(--surface2) var(--fill,50%)); outline:none; }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:24px; height:24px; border-radius:50%;
+  background:#fff; border:7px solid var(--blue); box-shadow:0 2px 8px rgba(0,0,0,.4); cursor:pointer; }
+
+/* 同心圆环形开关（30dp 规范） */
+.ring-switch{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; flex:none; }
+.ring-switch .rk{ width:30px; height:30px; border-radius:50%; position:relative;
+  border:1px solid var(--rule2);
+  transition:background .22s ease, border-color .22s ease, box-shadow .22s ease; }
+.ring-switch .rk::after{ content:""; position:absolute; inset:8px; border-radius:50%;
+  background:var(--ink3); transition:background .22s ease, transform .22s ease; }
+.ring-switch.on .rk{ background:var(--green); border-color:var(--green);
+  box-shadow:0 0 0 1px rgba(255,255,255,.18) inset; }
+.ring-switch.on .rk::after{ background:#fff; }
+
+/* ============ 悬浮胶囊导航 + FAB ============ */
+.dock{ position:absolute; left:0; right:0; bottom:0; height:118px; z-index:40;
+  display:flex; align-items:flex-end; justify-content:center; gap:12px;
+  padding:0 18px 26px; pointer-events:none; }
+.dock > *{ pointer-events:auto; }
+.capsule{ flex:1; max-width:300px; height:64px; border-radius:999px;
+  background:var(--surface); border:1px solid var(--rule2);
+  box-shadow:var(--dock-shadow);
+  display:flex; align-items:center; padding:7px; }
+.tab{ flex:1; height:50px; border-radius:999px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; color:var(--ink3); transition:background .25s ease, color .25s ease; }
+.tab svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.9; }
+.tab span{ font-size:10px; font-weight:600; letter-spacing:.3px; }
+.tab.active{ background:var(--tab-active); color:#fff; }
+body.light .tab.active{ color:#fff; }
+body.light .tab:not(.active){ color:var(--ink3); }
+
+.fab{ width:64px; height:64px; border-radius:50%; flex:none;
+  background:var(--blue); display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--fab-shadow); border:1px solid rgba(255,255,255,.14);
+  transition:background .3s ease, transform .2s ease; }
+.fab:active{ transform:scale(.93); }
+.fab svg{ width:26px; height:26px; fill:#fff; }
+.fab.recording{ background:var(--red); box-shadow:0 12px 28px -8px rgba(255,90,95,.7); }
+.fab-label{ position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); font-size:9.5px;
+  font-weight:700; color:var(--ink3); letter-spacing:1px; white-space:nowrap; }
+
+/* ============ 弹窗 / Sheet ============ */
+.overlay-mask{ position:absolute; inset:0; background:rgba(0,0,0,.45); z-index:70;
+  opacity:0; pointer-events:none; transition:opacity .3s ease; }
+.sheet-layer{ position:absolute; inset:0; z-index:80; pointer-events:none; }
+.sheet-layer.open{ pointer-events:auto; }
+.sheet-layer.open .overlay-mask{ opacity:1; }
+.sheet{
+  position:absolute; left:8px; right:8px; bottom:8px;
+  background:var(--surface); border:1px solid var(--rule2); border-radius:30px;
+  max-height:86%; display:flex; flex-direction:column;
+  transform:translateY(108%); transition:transform .42s cubic-bezier(.32,.85,.28,1);
+  box-shadow:0 -20px 60px rgba(0,0,0,.5);
+}
+.sheet-layer.open .sheet{ transform:translateY(0); }
+.sheet.grab-move{ transition:none; }
+.grabber{ width:40px; height:5px; border-radius:3px; background:var(--rule2); margin:9px auto 0; flex:none; }
+.sheet-head{ flex:none; display:flex; align-items:center; justify-content:space-between; padding:10px 18px 6px; }
+.sh-round{ width:34px; height:34px; border-radius:50%; background:var(--surface2); display:flex;
+  align-items:center; justify-content:center; }
+.sh-round svg{ width:15px; height:15px; stroke:var(--ink2); fill:none; stroke-width:2.3; }
+.sh-round.confirm{ background:var(--blue); }
+.sh-round.confirm svg{ stroke:#fff; }
+.sh-title{ font-size:16px; font-weight:700; }
+.sheet-body{ overflow-y:auto; padding:4px 18px 30px; scrollbar-width:none; }
+.sheet-body::-webkit-scrollbar{ display:none; }
+
+.sheet-desc{ font-size:12.5px; color:var(--ink3); line-height:1.65; margin:2px 2px 14px; }
+.cal-step{ display:flex; gap:13px; padding:13px 2px; }
+.cal-step .n{ width:26px; height:26px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; background:var(--surface2); color:var(--ink2); }
+.cal-step.done .n{ background:var(--green-soft); color:var(--green); }
+.cal-step b{ font-size:13.5px; display:block; }
+.cal-step span{ font-size:11.5px; color:var(--ink3); display:block; margin-top:2px; }
+
+.chip-pick{ display:flex; flex-wrap:wrap; gap:9px; margin:6px 0 14px; }
+.chip-pick .cp{ min-height:44px; padding:0 15px; display:flex; align-items:center; border-radius:999px;
+  font-size:12.5px; font-weight:600; background:var(--surface2); border:1.5px solid transparent; color:var(--ink2); }
+.chip-pick .cp.on{ border-color:var(--blue); background:var(--blue-soft); color:var(--blue); }
+.sheet-textarea{ width:100%; min-height:130px; border-radius:18px; background:var(--surface2); border:none;
+  padding:15px; font:inherit; font-size:14px; line-height:1.7; color:var(--ink); resize:none; outline:none; }
+.sheet-textarea::placeholder{ color:var(--ink3); }
+
+/* 会话明细时间线 */
+.timeline{ padding:4px 2px 10px; }
+.tl-row{ display:flex; gap:14px; min-height:48px; position:relative; padding-bottom:14px; }
+.tl-row:last-child{ padding-bottom:0; }
+.tl-rail{ display:flex; flex-direction:column; align-items:center; width:14px; flex:none; }
+.tl-rail i{ width:11px; height:11px; border-radius:50%; margin-top:4px; position:relative; z-index:1; }
+.tl-rail::after{ content:""; flex:1; width:2px; background:var(--rule); margin-top:2px; }
+.tl-row:last-child .tl-rail::after{ display:none; }
+.tl-main{ flex:1; }
+.tl-main b{ font-size:14px; }
+.tl-main span{ display:block; font-size:11.5px; color:var(--ink3); margin-top:3px; }
+.tl-dur{ font-size:12.5px; font-weight:700; color:var(--ink2); padding-top:2px; }
+
+/* ============ iOS 风格上下文菜单 ============ */
+.ctx-mask{ position:absolute; inset:0; z-index:90; background:rgba(0,0,0,.01); }
+.ctx-menu{ position:absolute; z-index:91; width:220px; border-radius:16px; overflow:hidden;
+  background:var(--elevated); border:1px solid var(--rule2); box-shadow:0 24px 60px rgba(0,0,0,.55);
+  transform:scale(.85); opacity:0; transform-origin:var(--cx,50%) var(--cy,50%);
+  transition:transform .18s cubic-bezier(.2,.9,.3,1.3), opacity .18s; }
+.ctx-menu.show{ transform:scale(1); opacity:1; }
+.ctx-item{ width:100%; min-height:48px; display:flex; align-items:center; gap:12px; padding:0 16px;
+  font-size:14.5px; text-align:left; border-bottom:1px solid var(--rule); }
+.ctx-item:last-child{ border-bottom:none; }
+.ctx-item svg{ width:17px; height:17px; fill:none; stroke-width:1.9; stroke:var(--ink2); }
+.ctx-item.danger{ color:var(--red); }
+.ctx-item.danger svg{ stroke:var(--red); }
+
+/* ============ Toast ============ */
+.toast{ position:absolute; left:50%; bottom:138px; transform:translate(-50%,14px); z-index:110;
+  background:rgba(28,33,42,.96); border:1px solid var(--rule2);
+  color:#F3F6FA; font-size:13px; font-weight:600; padding:12px 18px; border-radius:14px;
+  display:flex; align-items:center; gap:9px; opacity:0; pointer-events:none;
+  transition:opacity .28s ease, transform .28s ease; max-width:80%; white-space:nowrap;
+  box-shadow:0 14px 40px rgba(0,0,0,.5); }
+.toast.show{ opacity:1; transform:translate(-50%,0); }
+.toast svg{ width:16px; height:16px; fill:none; stroke-width:2.4; flex:none; }
+.toast.t-ok svg{ stroke:var(--green); }
+.toast.t-err svg{ stroke:var(--red); }
+.toast.t-info svg{ stroke:var(--blue); }
+
+/* ============ 空状态 ============ */
+.empty-screen{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:0 44px; }
+.empty-screen .e-illus{ width:96px; height:96px; border-radius:50%; background:var(--surface);
+  border:1px solid var(--rule); display:flex; align-items:center; justify-content:center; margin-bottom:24px; }
+.empty-screen .e-illus svg{ width:44px; height:44px; fill:none; stroke:var(--ink3); stroke-width:1.5; }
+.empty-screen h2{ font-size:22px; font-weight:800; margin-bottom:10px; letter-spacing:-.3px; }
+.empty-screen p{ font-size:13.5px; color:var(--ink3); line-height:1.7; margin-bottom:26px; }
+.empty-screen .e-btn{ min-height:48px; padding:0 26px; border-radius:999px; background:var(--blue);
+  color:#fff; font-size:14.5px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.onboard-logo{ width:84px; height:84px; border-radius:24px; margin-bottom:28px; position:relative;
+  background:conic-gradient(from 210deg,#2F8AF5,#B46CF0,#34C759,#F7C948,#2F8AF5);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 20px 50px -14px rgba(47,138,245,.6); }
+.onboard-logo::after{ content:""; position:absolute; inset:7px; border-radius:19px; background:var(--bg); }
+.onboard-logo svg{ position:relative; z-index:1; width:38px; height:38px; fill:none; stroke:#fff; stroke-width:2; }
+.privacy-note{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink3); margin-top:16px; }
+.privacy-note svg{ width:13px; height:13px; fill:none; stroke:var(--green); stroke-width:2.2; }
+.fab-guide{ position:absolute; right:46px; bottom:120px; z-index:5; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.fab-guide span{ font-size:11px; font-weight:700; color:var(--yellow);
+  background:var(--yellow-soft); padding:5px 11px; border-radius:999px; }
+.fab-guide svg{ width:26px; height:26px; fill:none; stroke:var(--yellow); stroke-width:2.2;
+  animation:arrowBounce 1.4s infinite; }
+@keyframes arrowBounce{ 0%,100%{ transform:translateY(0); opacity:.6;} 50%{ transform:translateY(8px); opacity:1;} }
+
+/* FAB 在首启空态的展示（无胶囊） */
+.dock.solo{ justify-content:flex-end; }
+.dock.solo .capsule{ display:none; }
+.no-tabbar{ padding-bottom:40px; }
+
+/* 页内纵向元素通用 */
+.mt10{ margin-top:10px; } .mt14{ margin-top:14px; } .mb4{ margin-bottom:4px; }
+</style>
+</head>
+<body>
+
+<!-- ================= SVG 图标库 ================= -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4"/><path d="M12.5 16V8"/><path d="M17 16v-6"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3V4Z"/><path d="M5 20a3 3 0 0 1 3-3h11"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.5 5 5 10-11"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
+  <symbol id="i-forward" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.8v14.4c0 .8.9 1.3 1.6.9l11-7.2c.6-.4.6-1.4 0-1.8l-11-7.2C7.9 3.5 7 4 7 4.8Z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10.5 19a2 2 0 0 0 3 0"/></symbol>
+  <symbol id="i-vibrate" viewBox="0 0 24 24"><rect x="8" y="3.5" width="8" height="17" rx="2.5"/><path d="M3.5 8.5 5 12l-1.5 3.5M20.5 8.5 19 12l1.5 3.5"/></symbol>
+  <symbol id="i-bg" viewBox="0 0 24 24"><path d="M4 7h11M4 12h16M4 17h7"/><circle cx="18" cy="17" r="2.6"/><path d="m19.9 18.9 2 2"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5 15.5V5.5A2 2 0 0 1 7 3.5h8.5"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 14V3.5"/><path d="m8 7 4-4 4 4"/><path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m13.5 8.5 3 3"/></symbol>
+  <symbol id="i-walk" viewBox="0 0 24 24"><circle cx="14" cy="4.5" r="2.2"/><path d="M10 21l2-6 3 2v4"/><path d="m12 15-1.5-4.5L13 8l3 2.5M14 10.5l-3 1M10.5 10.5 8 12"/></symbol>
+  <symbol id="i-sit" viewBox="0 0 24 24"><circle cx="15" cy="4.5" r="2"/><path d="M11 9.5 9 14v4M11 9.5l3 2.5L17 13M9 14h11M6 21l3-5"/></symbol>
+  <symbol id="i-stand" viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2"/><path d="M11 8 9.5 21M13 8l1.5 13M9.5 12h5M10 8h4"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 14l4-4"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4.5"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="M4 8v8l8 4 8-4V8M12 12v8"/></symbol>
+  <symbol id="i-signal" viewBox="0 0 24 24"><rect x="3" y="14" width="3.4" height="6" rx="1" fill="currentColor" stroke="none"/><rect x="8.4" y="10.5" width="3.4" height="9.5" rx="1" fill="currentColor" stroke="none"/><rect x="13.8" y="7" width="3.4" height="13" rx="1" fill="currentColor" stroke="none"/><rect x="19" y="3.5" width="2.4" height="16.5" rx="1" fill="currentColor" stroke="none" opacity=".35"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M3 10.2c5-4.2 13-4.2 18 0"/><path d="M6.2 13.6c3.2-2.7 8.4-2.7 11.6 0"/><path d="M9.4 17c1.6-1.3 3.6-1.3 5.2 0"/><circle cx="12" cy="19.4" r="1.3" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2.5" y="7.5" width="17" height="9" rx="2.5"/><rect x="4.5" y="9.5" width="11" height="5" rx="1.2" fill="currentColor" stroke="none"/><path d="M21.5 10.5v3" stroke-linecap="round"/></symbol>
+</svg>
+
+<!-- ================= 画板顶部 ================= -->
+<div class="board-bar">
+  <div class="brand"><span class="logo-dot"></span>小幽日记 <small>XiaoYou Diary · Design Board</small></div>
+  <div class="board-chips">
+    <span class="chip">深色优先 · Dark First</span>
+    <span class="chip">Apple HIG</span>
+    <span class="chip">4 Tab + FAB</span>
+    <span class="chip">44px 点击热区</span>
+    <span class="chip">无毛玻璃</span>
+  </div>
+  <div class="spacer"></div>
+  <span class="board-hint">试试：点 FAB 启停检测 · 长按历史记录 · 打开写日记</span>
+  <button class="board-btn" id="themeBtn" onclick="toggleBoardTheme()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#i-moon"/></svg>
+    <span id="themeTxt">浅色预览</span>
+  </button>
+</div>
+
+<!-- ================= 画板 ================= -->
+<div class="canvas" id="canvas">
+
+<!-- 复用由 JS 生成状态栏 -->
+
+<!-- ================= 01 概览 ================= -->
+<div class="frame" id="f-home">
+  <div class="frame-caption"><span class="frame-no">01</span><span class="frame-title">概览</span><span class="frame-sub">Overview · 实时行为识别</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="navbar">
+        <div class="nav-title"><h1>概览</h1><span class="sub">10月12日 周一 · 实时识别</span></div>
+        <div style="display:flex;gap:8px">
+          <button class="icon-cap tight" data-act="calibrate" title="传感器校准"><svg><use href="#i-target"/></svg></button>
+          <button class="icon-cap tight" data-go="f-settings" title="设置"><svg><use href="#i-gear"/></svg></button>
+        </div>
+      </div>
+      <div class="content">
+
+        <!-- 实时行为 -->
+        <div class="surface hero" id="heroLive">
+          <div class="hero-top">
+            <span class="badge purple"><span class="dot"></span>检测中</span>
+            <span class="meta-fs"><svg><use href="#i-gauge"/></svg>50Hz · 加速度/陀螺仪/重力</span>
+          </div>
+          <div class="hero-main">
+            <div class="hero-behavior" id="liveBehavior">行走</div>
+            <div class="hero-conf"><div class="pct num" id="liveConf">92<span style="font-size:20px">%</span></div><div class="pct-label">置信度</div></div>
+          </div>
+          <div class="hero-sub"><span>持续 <b class="num" id="liveDur">12:34</b></span><span>本次切换 <b class="num" id="liveSwitch">3</b> 次</span></div>
+          <svg class="wave" viewBox="0 0 320 40" preserveAspectRatio="none"><path id="wavePath" d="M0,20 Q20,4 40,20 T80,20 T120,20 T160,20 T200,20 T240,20 T280,20 T320,20"/></svg>
+        </div>
+
+        <!-- 姿态参数 -->
+        <div class="group">
+          <div class="group-head"><span class="g-label gray">姿态参数 · ATTITUDE</span></div>
+          <div class="surface">
+            <div class="pose-grid pad">
+              <div class="pose-cell"><div class="k">Pitch</div><div class="v num" id="poseP">-3.2<small>°</small></div><div class="pose-axis"><i></i><b style="left:34%"></b></div></div>
+              <div class="pose-cell"><div class="k">Roll</div><div class="v num" id="poseR">1.8<small>°</small></div><div class="pose-axis"><i></i><b style="left:58%"></b></div></div>
+              <div class="pose-cell"><div class="k">Yaw</div><div class="v num" id="poseY">87.5<small>°</small></div><div class="pose-axis"><i></i><b style="left:76%"></b></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 概率排名 -->
+        <div class="group">
+          <div class="group-head"><span class="g-label accent">8 分类行为概率</span><span class="g-more">实时</span></div>
+          <div class="surface"><div class="prob-list" id="probList">
+            <div class="prob-row c-walk is-top"><span class="prob-name">行走</span><div class="prob-track"><div class="prob-fill" style="width:92%"></div></div><span class="prob-val num">92%</span></div>
+            <div class="prob-row c-sit"><span class="prob-name">静坐</span><div class="prob-track"><div class="prob-fill" style="width:4%"></div></div><span class="prob-val num">4%</span></div>
+            <div class="prob-row c-stand"><span class="prob-name">站立</span><div class="prob-track"><div class="prob-fill" style="width:2%"></div></div><span class="prob-val num">2%</span></div>
+            <div class="prob-row c-jog"><span class="prob-name">慢跑</span><div class="prob-track"><div class="prob-fill" style="width:1%"></div></div><span class="prob-val num">1%</span></div>
+            <div class="prob-row c-tilt"><span class="prob-name">倾斜</span><div class="prob-track"><div class="prob-fill" style="width:.5%"></div></div><span class="prob-val num">.5%</span></div>
+            <div class="prob-row c-lie"><span class="prob-name">平躺</span><div class="prob-track"><div class="prob-fill" style="width:.3%"></div></div><span class="prob-val num">.3%</span></div>
+            <div class="prob-row c-side"><span class="prob-name">侧躺</span><div class="prob-track"><div class="prob-fill" style="width:.15%"></div></div><span class="prob-val num">.1%</span></div>
+            <div class="prob-row c-run"><span class="prob-name">快跑</span><div class="prob-track"><div class="prob-fill" style="width:.05%"></div></div><span class="prob-val num">0%</span></div>
+          </div></div>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="group">
+          <div class="group-head"><span class="g-label gray">快捷操作</span><span class="g-more">更多<svg><use href="#i-forward"/></svg></span></div>
+          <div class="surface action-list">
+            <button class="action-row primary" id="btnStart"><span class="a-ico"><svg><use href="#i-play"/></svg></span><span class="a-txt"><b>开始检测</b><span>持续识别并每 30 秒记录一条</span></span><svg class="a-go"><use href="#i-forward"/></svg></button>
+            <div class="row-divider"></div>
+            <button class="action-row danger" id="btnStop"><span class="a-ico"><svg><use href="#i-stop"/></svg></span><span class="a-txt"><b>停止检测</b><span>结束本次识别会话</span></span><svg class="a-go"><use href="#i-forward"/></svg></button>
+            <div class="row-divider"></div>
+            <button class="action-row neutral" id="btnOnce"><span class="a-ico"><svg><use href="#i-bolt"/></svg></span><span class="a-txt"><b>单次检测</b><span>采样 10 秒后输出一次结果</span></span><svg class="a-go"><use href="#i-forward"/></svg></button>
+            <div class="row-divider"></div>
+            <button class="action-row neutral" data-act="calibrate"><span class="a-ico"><svg><use href="#i-target"/></svg></span><span class="a-txt"><b>传感器校准</b><span>静置 / 水平 / 六面校准</span></span><svg class="a-go"><use href="#i-forward"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 悬浮胶囊 + FAB -->
+      <div class="dock">
+        <div class="capsule">
+          <button class="tab active" data-go="f-home"><svg><use href="#i-home"/></svg><span>概览</span></button>
+          <button class="tab" data-go="f-analyze"><svg><use href="#i-chart"/></svg><span>分析</span></button>
+          <button class="tab" data-go="f-diary"><svg><use href="#i-book"/></svg><span>日记</span></button>
+          <button class="tab" data-go="f-history"><svg><use href="#i-clock"/></svg><span>历史</span></button>
+        </div>
+        <button class="fab recording" id="fabHome" title="开始/停止检测" style="position:relative"><svg id="fabIcon"><use href="#i-stop"/></svg><span class="fab-label">停止检测</span></button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ================= 02 数据分析 ================= -->
+<div class="frame" id="f-analyze">
+  <div class="frame-caption"><span class="frame-no">02</span><span class="frame-title">数据分析</span><span class="frame-sub">Analytics · 周视图 / 图表</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="navbar">
+        <div class="nav-title"><h1>数据分析</h1><span class="sub">行为统计可视化</span></div>
+        <div style="display:flex;gap:8px">
+          <button class="icon-cap tight"><svg><use href="#i-calendar"/></svg></button>
+          <button class="icon-cap tight"><svg><use href="#i-export"/></svg></button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="segment">
+          <button data-seg="day"><span style="font-size:15px">日</span></button>
+          <button class="on" data-seg="week"><span style="font-size:15px">周</span></button>
+        </div>
+
+        <div class="week-nav">
+          <button class="wn-btn"><svg><use href="#i-back"/></svg></button>
+          <div class="wn-center">
+            <div class="w1">2026 · 第 42 周 <span class="tag-week">本周</span></div>
+            <div class="w2 num">10.06 周一 – 10.12 周日</div>
+          </div>
+          <button class="wn-btn off" disabled><svg><use href="#i-forward"/></svg></button>
+        </div>
+
+        <div class="surface mt10">
+          <div class="stat-grid">
+            <div class="stat s-yellow"><div class="k">总时长</div><div class="v num">4<small>h</small>32<small>m</small></div></div>
+            <div class="stat s-blue"><div class="k">检测次数</div><div class="v num">18<small>次</small></div></div>
+            <div class="stat s-purple"><div class="k">主要行为</div><div class="v" style="font-size:19px;padding-top:3px">静坐</div></div>
+            <div class="stat s-green"><div class="k">达标率</div><div class="v num">86<small>%</small></div></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head"><span class="g-label accent">行为占比</span><span class="g-more">本周</span></div>
+          <div class="surface">
+            <div class="donut-wrap">
+              <div class="donut">
+                <svg width="132" height="132" viewBox="0 0 132 132">
+                  <circle cx="66" cy="66" r="52" fill="none" stroke="var(--surface2)" stroke-width="15"/>
+                  <circle cx="66" cy="66" r="52" fill="none" stroke="var(--blue)" stroke-width="15" stroke-dasharray="134 327" stroke-dashoffset="0"/>
+                  <circle cx="66" cy="66" r="52" fill="none" stroke="var(--green)" stroke-width="15" stroke-dasharray="104 327" stroke-dashoffset="-134"/>
+                  <circle cx="66" cy="66" r="52" fill="none" stroke="var(--purple)" stroke-width="15" stroke-dasharray="58 327" stroke-dashoffset="-238"/>
+                  <circle cx="66" cy="66" r="52" fill="none" stroke="var(--yellow)" stroke-width="15" stroke-dasharray="24 327" stroke-dashoffset="-296"/>
+                  <circle cx="66" cy="66" r="52" fill="none" stroke="var(--surface2)" stroke-width="15" stroke-dasharray="7 327" stroke-dashoffset="-320"/>
+                </svg>
+                <div class="dc"><b class="num">86%</b><span>活动达标率</span></div>
+              </div>
+              <div class="legend">
+                <div class="lg-row"><i style="background:var(--blue)"></i><span>静坐</span><b class="num">41%</b></div>
+                <div class="lg-row"><i style="background:var(--green)"></i><span>行走</span><b class="num">32%</b></div>
+                <div class="lg-row"><i style="background:var(--purple)"></i><span>站立</span><b class="num">18%</b></div>
+                <div class="lg-row"><i style="background:var(--yellow)"></i><span>慢跑</span><b class="num">7%</b></div>
+                <div class="lg-row"><i style="background:var(--ink3)"></i><span>其他</span><b class="num">2%</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head"><span class="g-label gray">24 小时分布</span><span class="g-more">← 横向滑动 →</span></div>
+          <div class="surface">
+            <div class="hscroll"><div class="bars24" id="bars24"></div></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head"><span class="g-label accent">周趋势 · 活动时长</span><span class="g-more">分钟/天</span></div>
+          <div class="surface">
+            <div class="trend">
+              <svg viewBox="0 0 340 150" preserveAspectRatio="none">
+                <defs><linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--blue)" stop-opacity=".35"/>
+                  <stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/>
+                </linearGradient></defs>
+                <line x1="0" y1="120" x2="340" y2="120" stroke="var(--rule)"/>
+                <path d="M8,102 L62,88 L116,95 L170,60 L224,72 L278,40 L332,54 L332,120 L8,120 Z" fill="url(#trendFill)"/>
+                <path d="M8,102 L62,88 L116,95 L170,60 L224,72 L278,40 L332,54" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <g fill="var(--blue)"><circle cx="8" cy="102" r="3.5"/><circle cx="62" cy="88" r="3.5"/><circle cx="116" cy="95" r="3.5"/><circle cx="170" cy="60" r="3.5"/><circle cx="224" cy="72" r="3.5"/><circle cx="278" cy="40" r="4.5" fill="var(--yellow)"/><circle cx="332" cy="54" r="3.5"/></g>
+              </svg>
+              <div class="trend-x num"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="capsule">
+          <button class="tab" data-go="f-home"><svg><use href="#i-home"/></svg><span>概览</span></button>
+          <button class="tab active" data-go="f-analyze"><svg><use href="#i-chart"/></svg><span>分析</span></button>
+          <button class="tab" data-go="f-diary"><svg><use href="#i-book"/></svg><span>日记</span></button>
+          <button class="tab" data-go="f-history"><svg><use href="#i-clock"/></svg><span>历史</span></button>
+        </div>
+        <button class="fab" data-go="f-home" style="position:relative"><svg><use href="#i-play"/></svg><span class="fab-label">开始检测</span></button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ================= 03 日记 ================= -->
+<div class="frame" id="f-diary">
+  <div class="frame-caption"><span class="frame-no">03</span><span class="frame-title">日记</span><span class="frame-sub">Diary · 心情 &amp; 行为标签</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="navbar">
+        <div class="nav-title"><h1>日记</h1><span class="sub">10月12日 · 记录此刻状态</span></div>
+        <button class="icon-cap tight"><svg><use href="#i-calendar"/></svg></button>
+      </div>
+      <div class="content">
+        <div class="group">
+          <div class="group-head"><span class="g-label accent">当日行为摘要</span><span class="badge green"><span class="dot"></span>已达标</span></div>
+          <div class="surface day-summary">
+            <div class="ds-row ds-walk"><span class="ds-ico"><svg><use href="#i-walk"/></svg></span><div class="ds-main"><b>行走</b><div class="ds-bar"><i style="width:64%"></i></div></div><span class="ds-v num">42 分钟</span></div>
+            <div class="row-divider"></div>
+            <div class="ds-row ds-sit"><span class="ds-ico"><svg><use href="#i-sit"/></svg></span><div class="ds-main"><b>静坐</b><div class="ds-bar"><i style="width:88%"></i></div></div><span class="ds-v num">3 小时 10 分</span></div>
+            <div class="row-divider"></div>
+            <div class="ds-row ds-stand"><span class="ds-ico"><svg><use href="#i-stand"/></svg></span><div class="ds-main"><b>站立</b><div class="ds-bar"><i style="width:38%"></i></div></div><span class="ds-v num">52 分钟</span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head"><span class="g-label gray">今天心情如何</span></div>
+          <div class="surface pad">
+            <div class="moods">
+              <button class="mood">😞</button><button class="mood">😕</button>
+              <button class="mood">😐</button><button class="mood on">🙂</button><button class="mood">😄</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head"><span class="g-label accent">今日日记</span><span class="g-more" id="openDiarySheet">写一篇<svg><use href="#i-forward"/></svg></span></div>
+          <div class="surface diary-item">
+            <div class="di-meta"><span class="num">21:30</span><span>·</span><span>检测绑定 2 个行为标签</span></div>
+            <div class="di-title">今天走了不少路</div>
+            <div class="di-text">午饭后绕着园区走了两圈，传感器显示连续行走 24 分钟，下午精神明显好了很多。久坐提醒在 15:20 震了一次，站起来接水顺便拉伸了五分钟。晚上准备 11 点半前睡觉，希望明天的达标率也能保持在 85% 以上。</div>
+            <div class="di-tags"><span class="tag t-walk">#行走</span><span class="tag t-sit">#静坐</span></div>
+          </div>
+          <button class="btn-full" id="composeBtn"><svg><use href="#i-edit"/></svg>写日记</button>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="capsule">
+          <button class="tab" data-go="f-home"><svg><use href="#i-home"/></svg><span>概览</span></button>
+          <button class="tab" data-go="f-analyze"><svg><use href="#i-chart"/></svg><span>分析</span></button>
+          <button class="tab active" data-go="f-diary"><svg><use href="#i-book"/></svg><span>日记</span></button>
+          <button class="tab" data-go="f-history"><svg><use href="#i-clock"/></svg><span>历史</span></button>
+        </div>
+        <button class="fab" data-go="f-home" style="position:relative"><svg><use href="#i-play"/></svg><span class="fab-label">开始检测</span></button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ================= 04 历史记录 ================= -->
+<div class="frame" id="f-history">
+  <div class="frame-caption"><span class="frame-no">04</span><span class="frame-title">历史记录</span><span class="frame-sub">History · 检测会话 · 长按呼出菜单</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="navbar">
+        <div class="nav-title"><h1>历史记录</h1><span class="sub">共 24 次检测会话</span></div>
+        <button class="icon-cap tight"><svg><use href="#i-search"/></svg></button>
+      </div>
+      <div class="content">
+        <div class="group-head mt10"><span class="g-label accent">今天</span></div>
+        <div class="surface">
+          <button class="session m-walk today" data-session="0">
+            <span class="s-main">
+              <span class="s-time num">09:24 – 10:56 <i class="live-dot" style="font-style:normal"></i></span>
+              <span class="s-desc">主导行为 · 行走 <span class="sep">|</span> 切换 12 次</span>
+            </span>
+            <span class="s-dur"><b class="num">1:32</b><span>小时</span></span>
+            <svg class="s-chev"><use href="#i-forward"/></svg>
+          </button>
+          <div class="row-divider"></div>
+          <button class="session m-sit" data-session="1">
+            <span class="s-main">
+              <span class="s-time num">14:02 – 15:41</span>
+              <span class="s-desc">主导行为 · 静坐 <span class="sep">|</span> 切换 5 次</span>
+            </span>
+            <span class="s-dur"><b class="num">1:39</b><span>小时</span></span>
+            <svg class="s-chev"><use href="#i-forward"/></svg>
+          </button>
+        </div>
+
+        <div class="group-head" style="margin-top:24px"><span class="g-label gray">更早</span></div>
+        <div class="surface">
+          <button class="session m-stand" data-session="2">
+            <span class="s-main">
+              <span class="s-time num">10月11日 19:10 – 19:48</span>
+              <span class="s-desc">主导行为 · 站立 <span class="sep">|</span> 切换 8 次</span>
+            </span>
+            <span class="s-dur"><b class="num">38</b><span>分钟</span></span>
+            <svg class="s-chev"><use href="#i-forward"/></svg>
+          </button>
+          <div class="row-divider"></div>
+          <button class="session m-walk" data-session="3">
+            <span class="s-main">
+              <span class="s-time num">10月10日 07:40 – 08:15</span>
+              <span class="s-desc">主导行为 · 行走 <span class="sep">|</span> 切换 3 次</span>
+            </span>
+            <span class="s-dur"><b class="num">35</b><span>分钟</span></span>
+            <svg class="s-chev"><use href="#i-forward"/></svg>
+          </button>
+          <div class="row-divider"></div>
+          <button class="session m-sit" data-session="4">
+            <span class="s-main">
+              <span class="s-time num">10月08日 13:30 – 16:02</span>
+              <span class="s-desc">主导行为 · 静坐 <span class="sep">|</span> 切换 6 次</span>
+            </span>
+            <span class="s-dur"><b class="num">2:32</b><span>小时</span></span>
+            <svg class="s-chev"><use href="#i-forward"/></svg>
+          </button>
+        </div>
+
+        <p style="font-size:11.5px;color:var(--ink3);text-align:center;margin-top:16px">长按会话可呼出 查看 / 复制 / 导出 / 删除 菜单</p>
+      </div>
+
+      <div class="dock">
+        <div class="capsule">
+          <button class="tab" data-go="f-home"><svg><use href="#i-home"/></svg><span>概览</span></button>
+          <button class="tab" data-go="f-analyze"><svg><use href="#i-chart"/></svg><span>分析</span></button>
+          <button class="tab" data-go="f-diary"><svg><use href="#i-book"/></svg><span>日记</span></button>
+          <button class="tab active" data-go="f-history"><svg><use href="#i-clock"/></svg><span>历史</span></button>
+        </div>
+        <button class="fab" data-go="f-home" style="position:relative"><svg><use href="#i-play"/></svg><span class="fab-label">开始检测</span></button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ================= 05 设置（二级页） ================= -->
+<div class="frame" id="f-settings">
+  <div class="frame-caption"><span class="frame-no">05</span><span class="frame-title">设置</span><span class="frame-sub">Settings · 二级页（不进主 Tab）</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="navbar">
+        <button class="round-btn" data-go="f-home"><svg><use href="#i-back"/></svg></button>
+        <div class="nav-title center"><h1>设置</h1></div>
+        <button class="round-btn" style="opacity:0;pointer-events:none"><svg><use href="#i-back"/></svg></button>
+      </div>
+      <div class="content">
+
+        <div class="group-head" style="margin-top:4px"><span class="g-label accent">检测参数</span></div>
+        <div class="surface">
+          <div class="slider-row">
+            <div class="sl-top"><span>采样率（Hz）</span><b class="num" data-slv>50</b></div>
+            <input type="range" min="10" max="200" step="10" value="50" />
+          </div>
+          <div class="row-divider"></div>
+          <div class="slider-row">
+            <div class="sl-top"><span>识别阈值</span><b class="num" data-slv>0.65</b></div>
+            <input type="range" min="30" max="95" step="5" value="65" data-fmt="threshold" />
+          </div>
+          <div class="row-divider"></div>
+          <div class="slider-row">
+            <div class="sl-top"><span>检测灵敏度</span><b data-slv>中</b></div>
+            <input type="range" min="0" max="2" step="1" value="1" data-fmt="sens" />
+          </div>
+          <div class="row-divider"></div>
+          <div class="slider-row">
+            <div class="sl-top"><span>久坐提醒间隔</span><b class="num" data-slv>45 分钟</b></div>
+            <input type="range" min="15" max="120" step="15" value="45" data-fmt="min" />
+          </div>
+        </div>
+
+        <div class="group-head" style="margin-top:26px"><span class="g-label accent">提醒与运行</span></div>
+        <div class="surface">
+          <button class="set-row"><span class="st-ico i-yellow"><svg><use href="#i-bell"/></svg></span><span class="st-main"><b>久坐提醒</b><span>每 45 分钟提醒起身活动</span></span><span class="ring-switch on" data-switch><span class="rk"></span></span></button>
+          <div class="row-divider"></div>
+          <button class="set-row"><span class="st-ico i-purple"><svg><use href="#i-vibrate"/></svg></span><span class="st-main"><b>震动反馈</b><span>状态变更与提醒时震动</span></span><span class="ring-switch on" data-switch><span class="rk"></span></span></button>
+          <div class="row-divider"></div>
+          <button class="set-row"><span class="st-ico i-blue"><svg><use href="#i-bg"/></svg></span><span class="st-main"><b>后台持续监测</b><span>切到后台后保持传感器采样</span></span><span class="ring-switch" data-switch><span class="rk"></span></span></button>
+          <div class="row-divider"></div>
+          <button class="set-row"><span class="st-ico i-gray"><svg><use href="#i-moon"/></svg></span><span class="st-main"><b>深色模式</b><span>跟随系统或手动切换</span></span><span class="ring-switch on" data-switch data-theme-switch><span class="rk"></span></span></button>
+        </div>
+
+        <div class="group-head" style="margin-top:26px"><span class="g-label gray">其他</span></div>
+        <div class="surface">
+          <button class="set-row" data-act="calibrate"><span class="st-ico i-green"><svg><use href="#i-target"/></svg></span><span class="st-main"><b>传感器校准</b><span>建议每周校准一次</span></span><span class="st-val">去校准 <svg><use href="#i-forward"/></svg></span></button>
+          <div class="row-divider"></div>
+          <button class="set-row"><span class="st-ico i-gray"><svg><use href="#i-shield"/></svg></span><span class="st-main"><b>隐私与数据</b><span>全部本地运算 · 不上传数据</span></span><span class="st-val"><svg><use href="#i-forward"/></svg></span></button>
+        </div>
+
+        <div class="group-head" style="margin-top:26px"><span class="g-label gray" style="color:var(--red)">危险操作</span></div>
+        <div class="surface">
+          <button class="set-row danger-text" data-danger="reset"><span class="st-ico i-red"><svg><use href="#i-chart"/></svg></span><span class="st-main"><b>重置统计数据</b><span>清除周/日统计，保留原始记录</span></span></button>
+          <div class="row-divider"></div>
+          <button class="set-row danger-text" data-danger="wipe"><span class="st-ico i-red"><svg><use href="#i-trash"/></svg></span><span class="st-main"><b>清除全部记录</b><span>不可恢复，请谨慎操作</span></span></button>
+        </div>
+        <p style="text-align:center;font-size:11px;color:var(--ink3);margin-top:18px">小幽日记 v1.0.0 · 本地离线识别</p>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ================= 06 空状态：首次启动 ================= -->
+<div class="frame" id="f-onboard">
+  <div class="frame-caption"><span class="frame-no">06</span><span class="frame-title">空状态 · 首次启动</span><span class="frame-sub">Empty State · Onboarding</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="empty-screen">
+        <div class="onboard-logo"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></svg></div>
+        <h2>小幽日记</h2>
+        <p>读取手机加速度计、陀螺仪与重力传感器，<br/>本地离线识别 8 类人体行为，<br/>实时给出类别、置信度与姿态角。</p>
+        <p style="margin-top:-12px;color:var(--ink2)">行走 · 慢跑 · 快跑 · 静坐 · 站立<br/>倾斜 · 平躺 · 侧躺</p>
+        <div class="privacy-note"><svg><use href="#i-shield"/></svg>全部本地运算 · 数据绝不上传</div>
+      </div>
+      <div class="fab-guide"><span>点这里开始第一次检测</span><svg><use href="#i-forward" style="transform:rotate(90deg)"/></svg></div>
+      <div class="dock solo">
+        <div class="capsule"></div>
+        <button class="fab" data-go="f-home" style="position:relative"><svg><use href="#i-play"/></svg><span class="fab-label">开始检测</span></button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ================= 07 空状态：历史为空 ================= -->
+<div class="frame" id="f-empty-history">
+  <div class="frame-caption"><span class="frame-no">07</span><span class="frame-title">空状态 · 无历史记录</span><span class="frame-sub">Empty State · No Sessions</span></div>
+  <div class="device"><div class="screen">
+    <div class="island"></div>
+    <div class="app-root">
+      <div class="statusbar"><span class="num">9:41</span><span class="sb-right"><svg width="18" height="12"><use href="#i-signal"/></svg><svg width="17" height="12"><use href="#i-wifi"/></svg><svg width="26" height="12"><use href="#i-battery"/></svg></span></div>
+      <div class="navbar">
+        <div class="nav-title"><h1>历史记录</h1></div>
+        <button class="icon-cap tight"><svg><use href="#i-search"/></svg></button>
+      </div>
+      <div class="empty-screen">
+        <div class="e-illus"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 9h6M9 13h6M9 17h3.5"/></svg></div>
+        <h2>暂无检测记录</h2>
+        <p>完成第一次检测后，会话会按日期<br/>自动归档到这里，支持分段明细查看。</p>
+        <button class="e-btn" data-go="f-home"><svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><use href="#i-play"/></svg>开始第一次检测</button>
+      </div>
+      <div class="dock">
+        <div class="capsule">
+          <button class="tab" data-go="f-home"><svg><use href="#i-home"/></svg><span>概览</span></button>
+          <button class="tab" data-go="f-analyze"><svg><use href="#i-chart"/></svg><span>分析</span></button>
+          <button class="tab" data-go="f-diary"><svg><use href="#i-book"/></svg><span>日记</span></button>
+          <button class="tab active" data-go="f-empty-history"><svg><use href="#i-clock"/></svg><span>历史</span></button>
+        </div>
+        <button class="fab" data-go="f-home" style="position:relative"><svg><use href="#i-play"/></svg><span class="fab-label">开始检测</span></button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+</div><!-- /canvas -->
+
+<script>
+/* ============================================================
+   交互脚本
+   ============================================================ */
+
+/* ---------- 主题切换（画板内所有手机联动） ---------- */
+function toggleBoardTheme(){
+  document.body.classList.toggle('light');
+  var light = document.body.classList.contains('light');
+  document.getElementById('themeTxt').textContent = light ? '深色预览' : '浅色预览';
+  var sw = document.querySelector('[data-theme-switch]');
+  if(sw) sw.classList.toggle('on', !light);
+}
+
+/* ---------- Tab 导航：滚动到对应画板 + 纵深入场回弹 ---------- */
+function goFrame(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'center', inline:'center'});
+  setTimeout(function(){
+    var root = el.querySelector('.app-root');
+    if(root){ root.classList.remove('bounce'); void root.offsetWidth; root.classList.add('bounce'); }
+  }, 320);
+}
+document.addEventListener('click', function(e){
+  var t = e.target.closest('[data-go]');
+  if(t){ goFrame(t.getAttribute('data-go')); }
+});
+
+/* ---------- Toast ---------- */
+function toast(screen, msg, type){
+  var t = screen.querySelector('.toast');
+  if(!t){
+    t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = '<svg viewBox="0 0 24 24"><use href="#i-check"/></svg><span></span>';
+    screen.appendChild(t);
+  }
+  t.className = 'toast t-' + (type||'ok');
+  var icon = t.querySelector('svg use');
+  icon.setAttribute('href', type==='err' ? '#i-x' : (type==='info' ? '#i-bell' : '#i-check'));
+  t.querySelector('span').textContent = msg;
+  requestAnimationFrame(function(){ t.classList.add('show'); });
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2000);
+}
+
+/* ---------- 弹窗系统（可堆叠 + 背景缩放 + 下滑关闭） ---------- */
+var sheetStack = [];
+function openSheet(screen, html){
+  screen.classList.add('scaled');
+  var layer = document.createElement('div');
+  layer.className = 'sheet-layer';
+  layer.innerHTML = '<div class="overlay-mask"></div>' + html;
+  screen.appendChild(layer);
+  requestAnimationFrame(function(){ layer.classList.add('open'); });
+  sheetStack.push(layer);
+
+  var mask = layer.querySelector('.overlay-mask');
+  mask.addEventListener('click', function(){ closeSheet(layer); });
+  layer.querySelectorAll('[data-close]').forEach(function(b){
+    b.addEventListener('click', function(){ closeSheet(layer); });
+  });
+
+  /* 下滑关闭 */
+  var sheet = layer.querySelector('.sheet');
+  var startY = null, dy = 0;
+  sheet.addEventListener('pointerdown', function(ev){
+    if(ev.target.closest('button,input,textarea,a')) return;
+    startY = ev.clientY; dy = 0; sheet.setPointerCapture(ev.pointerId);
+    sheet.classList.add('grab-move');
+  });
+  sheet.addEventListener('pointermove', function(ev){
+    if(startY===null) return;
+    dy = Math.max(0, ev.clientY - startY);
+    sheet.style.transform = 'translateY(' + dy + 'px)';
+    mask.style.opacity = Math.max(0, 1 - dy/300);
+  });
+  sheet.addEventListener('pointerup', function(){
+    if(startY===null) return;
+    sheet.classList.remove('grab-move');
+    sheet.style.transform = ''; mask.style.opacity = '';
+    if(dy > 110) closeSheet(layer);
+    startY = null;
+  });
+  return layer;
+}
+function closeSheet(layer){
+  if(!layer || !layer.parentNode) return;
+  layer.classList.remove('open');
+  var screen = layer.parentNode;
+  setTimeout(function(){
+    layer.remove();
+    var idx = sheetStack.indexOf(layer);
+    if(idx>-1) sheetStack.splice(idx,1);
+    if(sheetStack.length === 0) screen.classList.remove('scaled');
+  }, 380);
+}
+
+/* ---------- Sheet 内容模板 ---------- */
+function calibrationSheet(){
+  return '<div class="sheet"><div class="grabber"></div>'
+    + '<div class="sheet-head"><button class="sh-round" data-close><svg><use href="#i-x"/></svg></button>'
+    + '<span class="sh-title">传感器校准</span><button class="sh-round" data-close><svg><use href="#i-check"/></svg></button></div>'
+    + '<div class="sheet-body">'
+    + '<p class="sheet-desc">校准可提升姿态角与行为识别精度，建议将手机平放在桌面后按步骤进行。</p>'
+    + '<div class="surface"><div class="cal-step done"><span class="n"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><use href="#i-check"/></svg></span><div><b>静置设备</b><span>保持静止 3 秒，采集零漂基线</span></div></div>'
+    + '<div class="row-divider"></div><div class="cal-step done"><span class="n"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><use href="#i-check"/></svg></span><div><b>水平校准</b><span>屏幕朝上平放，对齐重力轴</span></div></div>'
+    + '<div class="row-divider"></div><div class="cal-step"><span class="n">3</span><div><b>六面校准</b><span>依次将六个面贴近桌面停留</span></div></div></div>'
+    + '<button class="btn-full" id="calRun"><svg><use href="#i-target"/></svg>开始校准</button>'
+    + '</div></div>';
+}
+function diarySheet(){
+  return '<div class="sheet"><div class="grabber"></div>'
+    + '<div class="sheet-head"><button class="sh-round" data-close><svg><use href="#i-x"/></svg></button>'
+    + '<span class="sh-title">写日记 · 10月12日</span><button class="sh-round confirm" id="diarySave"><svg><use href="#i-check"/></svg></button></div>'
+    + '<div class="sheet-body">'
+    + '<p class="sheet-desc">选择心情与绑定行为标签，日记仅保存在本机。</p>'
+    + '<div class="moods" style="padding:0 0 8px">'
+    + '<button class="mood">😞</button><button class="mood">😕</button><button class="mood">😐</button><button class="mood on">🙂</button><button class="mood">😄</button></div>'
+    + '<div class="group-head" style="margin-top:14px"><span class="g-label gray">绑定行为标签</span></div>'
+    + '<div class="chip-pick" id="tagPick">'
+    + '<button class="cp on" data-tag>#行走</button><button class="cp" data-tag>#静坐</button><button class="cp" data-tag>#站立</button>'
+    + '<button class="cp" data-tag>#慢跑</button><button class="cp" data-tag>#快跑</button><button class="cp" data-tag>#倾斜</button>'
+    + '<button class="cp" data-tag>#平躺</button><button class="cp" data-tag>#侧躺</button></div>'
+    + '<button class="set-row surface" id="moodMore" style="border:1px solid var(--rule);border-radius:16px;margin-bottom:14px"><span class="st-ico i-purple"><svg><use href="#i-plus"/></svg></span><span class="st-main"><b>添加更细的状态</b><span>精力 / 压力 / 睡眠（第二层弹窗）</span></span><span class="st-val"><svg><use href="#i-forward"/></svg></span></button>'
+    + '<textarea class="sheet-textarea" placeholder="记录此刻的身体状态与感受…&#10;例如：午后散步 20 分钟，久坐提醒后起身拉伸。"></textarea>'
+    + '</div></div>';
+}
+function subSheet(){
+  return '<div class="sheet" style="max-height:62%"><div class="grabber"></div>'
+    + '<div class="sheet-head"><button class="sh-round" data-close-sub><svg><use href="#i-x"/></svg></button>'
+    + '<span class="sh-title">添加状态标签</span><button class="sh-round confirm" data-close-sub><svg><use href="#i-check"/></svg></button></div>'
+    + '<div class="sheet-body"><div class="chip-pick" style="margin-top:6px">'
+    + ['精力充沛','有点疲惫','压力较大','放松','睡眠不足','肩颈僵硬'].map(function(t,i){
+        return '<button class="cp'+(i===0?' on':'')+'" data-tag>'+t+'</button>'; }).join('')
+    + '</div><p class="sheet-desc">弹窗可多层堆叠；关闭本层后回到日记编辑层。</p></div></div>';
+}
+var sessions = [
+  {t:'09:24 – 10:56', rows:[['行走','09:24 – 09:48',  '24 分钟','var(--green)'],['静坐','09:48 – 10:20','32 分钟','var(--blue)'],['站立','10:20 – 10:31','11 分钟','var(--purple)'],['行走','10:31 – 10:56','25 分钟','var(--green)']]},
+  {t:'14:02 – 15:41', rows:[['静坐','14:02 – 15:10','68 分钟','var(--blue)'],['站立','15:10 – 15:22','12 分钟','var(--purple)'],['静坐','15:22 – 15:41','19 分钟','var(--blue)']]},
+  {t:'10月11日 19:10 – 19:48', rows:[['站立','19:10 – 19:30','20 分钟','var(--purple)'],['行走','19:30 – 19:48','18 分钟','var(--green)']]},
+  {t:'10月10日 07:40 – 08:15', rows:[['行走','07:40 – 08:02','22 分钟','var(--green)'],['慢跑','08:02 – 08:15','13 分钟','var(--yellow)']]},
+  {t:'10月08日 13:30 – 16:02', rows:[['静坐','13:30 – 16:02','152 分钟','var(--blue)']]}
+];
+function detailSheet(i){
+  var s = sessions[i];
+  return '<div class="sheet" style="max-height:78%"><div class="grabber"></div>'
+    + '<div class="sheet-head"><button class="sh-round" data-close><svg><use href="#i-x"/></svg></button>'
+    + '<span class="sh-title num">会话明细</span><button class="sh-round" data-close><svg><use href="#i-export"/></svg></button></div>'
+    + '<div class="sheet-body">'
+    + '<p class="sheet-desc num" style="margin-bottom:4px">'+s.t+' · 共 '+s.rows.length+' 段</p>'
+    + '<div class="timeline surface" style="padding:14px 18px">'
+    + s.rows.map(function(r,idx){
+        return '<div class="tl-row"><div class="tl-rail"><i style="background:'+r[3]+'"></i></div>'
+          + '<div class="tl-main"><b style="color:'+r[3]+'">'+r[0]+'</b><span class="num">'+r[1]+'</span></div>'
+          + '<div class="tl-dur num">'+r[2]+'</div></div>'
+          + (idx<s.rows.length-1 ? '' : '');
+      }).join('')
+    + '</div></div></div>';
+}
+
+/* ---------- 概览：检测模拟 ---------- */
+var homeFrame = document.getElementById('f-home');
+var detecting = true, timer = null, elapsed = 12*60+34, switches = 3;
+var behaviors = [
+  {name:'行走', cls:'c-walk', val:92},
+  {name:'静坐', cls:'c-sit', val:4},
+  {name:'站立', cls:'c-stand', val:2},
+  {name:'慢跑', cls:'c-jog', val:1}
+];
+function wavePath(){
+  var d='M0,20', y=20;
+  for(var x=8;x<=320;x+=8){ y = 20 + Math.sin(x/9 + Math.random()*2) * (detecting?13:3) + (Math.random()*4-2); d += ' L'+x+','+y.toFixed(1); }
+  document.getElementById('wavePath').setAttribute('d', d);
+}
+function tick(){
+  if(!detecting) return;
+  elapsed++;
+  var m = Math.floor(elapsed/60), s = elapsed%60;
+  document.getElementById('liveDur').textContent = m + ':' + (s<10?'0':'') + s;
+  var conf = 86 + Math.round(Math.random()*11);
+  document.getElementById('liveConf').innerHTML = conf + '<span style="font-size:20px">%</span>';
+  ['poseP','poseR','poseY'].forEach(function(id,idx){
+    var base = [-3.2, 1.8, 87.5][idx], range = [6,5,10][idx];
+    var v = (base + (Math.random()-.5)*range);
+    document.getElementById(id).innerHTML = v.toFixed(1) + '<small>°</small>';
+  });
+  var rows = document.querySelectorAll('#probList .prob-row');
+  var vals = [conf, 100-conf];
+  var rest = vals[1];
+  rows.forEach(function(r,i){
+    var v = i===0 ? conf : (i===1 ? Math.round(rest*.55) : Math.max(0, Math.round(rest * (i===2?.28 : .08) + Math.random()*2 -1)));
+    if(i>2) v = Math.max(0, v - (i-3));
+    var fill = r.querySelector('.prob-fill'), val = r.querySelector('.prob-val');
+    fill.style.width = v + '%'; val.textContent = v + '%';
+    r.classList.toggle('is-top', i===0);
+  });
+  if(Math.random() < .12){ switches++; document.getElementById('liveSwitch').textContent = switches; }
+  wavePath();
+}
+timer = setInterval(tick, 1000);
+wavePath();
+
+function setDetecting(on, screen){
+  detecting = on;
+  var fab = document.getElementById('fabHome');
+  var icon = document.getElementById('fabIcon');
+  var label = fab.querySelector('.fab-label');
+  var hero = document.getElementById('heroLive');
+  if(on){
+    fab.classList.add('recording');
+    icon.innerHTML = '<use href="#i-stop"/>';
+    label.textContent = '停止检测';
+    hero.innerHTML =
+      '<div class="hero-top"><span class="badge purple"><span class="dot"></span>检测中</span>'
+      + '<span class="meta-fs"><svg><use href="#i-gauge"/></svg>50Hz · 加速度/陀螺仪/重力</span></div>'
+      + '<div class="hero-main"><div class="hero-behavior" id="liveBehavior">行走</div>'
+      + '<div class="hero-conf"><div class="pct num" id="liveConf">92<span style="font-size:20px">%</span></div><div class="pct-label">置信度</div></div></div>'
+      + '<div class="hero-sub"><span>持续 <b class="num" id="liveDur">12:34</b></span><span>本次切换 <b class="num" id="liveSwitch">3</b> 次</span></div>'
+      + '<svg class="wave" viewBox="0 0 320 40" preserveAspectRatio="none"><path id="wavePath"/></svg>';
+    toast(screen, '检测已开始 · 50Hz 采样', 'info');
+  }else{
+    fab.classList.remove('recording');
+    icon.innerHTML = '<use href="#i-play"/>';
+    label.textContent = '开始检测';
+    hero.innerHTML =
+      '<div class="hero-top"><span class="badge green"><span class="dot"></span>已停止</span>'
+      + '<span class="meta-fs"><svg><use href="#i-gauge"/></svg>本次会话 12 分 34 秒</span></div>'
+      + '<div class="hero-stopped"><div class="illus"><svg><use href="#i-bolt"/></svg></div>'
+      + '<h3>暂无实时采集数据</h3><p>检测已停止，点击下方按钮或右侧 FAB<br/>即可重新开始行为识别</p></div>';
+    toast(screen, '检测已停止 · 会话已保存', 'ok');
+  }
+}
+document.getElementById('fabHome').addEventListener('click', function(){
+  setDetecting(!detecting, homeFrame.querySelector('.screen'));
+});
+document.getElementById('btnStart').addEventListener('click', function(){ if(!detecting) setDetecting(true, homeFrame.querySelector('.screen')); });
+document.getElementById('btnStop').addEventListener('click', function(){ if(detecting) setDetecting(false, homeFrame.querySelector('.screen')); });
+document.getElementById('btnOnce').addEventListener('click', function(){
+  var scr = homeFrame.querySelector('.screen');
+  toast(scr, '单次检测完成：静坐 · 置信度 88%', 'ok');
+});
+
+/* 校准入口（概览 + 设置通用） */
+document.addEventListener('click', function(e){
+  var b = e.target.closest('[data-act="calibrate"]');
+  if(!b) return;
+  var screen = b.closest('.screen');
+  var layer = openSheet(screen, calibrationSheet());
+  setTimeout(function(){
+    var run = layer.querySelector('#calRun');
+    if(run) run.addEventListener('click', function(){
+      run.innerHTML = '校准中…';
+      run.style.opacity = '.7';
+      var steps = layer.querySelectorAll('.cal-step');
+      steps.forEach(function(st,i){ setTimeout(function(){ st.classList.add('done'); st.querySelector('.n').innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><use href="#i-check"/></svg>'; }, 500*(i+1)); });
+      setTimeout(function(){ closeSheet(layer); toast(screen, '传感器校准完成', 'ok'); }, 2300);
+    });
+  }, 0);
+});
+
+/* ---------- 日记：心情 / 标签 / 堆叠弹窗 ---------- */
+function bindMood(scope){
+  scope.querySelectorAll('.mood').forEach(function(m){
+    m.addEventListener('click', function(){
+      scope.querySelectorAll('.mood').forEach(function(x){ x.classList.remove('on'); });
+      m.classList.add('on');
+    });
+  });
+}
+bindMood(document.getElementById('f-diary'));
+document.querySelectorAll('#f-diary .moods .mood').forEach(function(){});
+
+function openDiary(screen){
+  var layer = openSheet(screen, diarySheet());
+  setTimeout(function(){
+    bindMood(layer);
+    layer.querySelectorAll('[data-tag]').forEach(function(c){
+      c.addEventListener('click', function(){ c.classList.toggle('on'); });
+    });
+    layer.querySelector('#diarySave').addEventListener('click', function(){
+      closeSheet(layer); toast(screen, '日记保存成功', 'ok');
+    });
+    layer.querySelector('#moodMore').addEventListener('click', function(){
+      var sub = openSheet(screen, subSheet());
+      setTimeout(function(){
+        sub.querySelectorAll('[data-tag]').forEach(function(c){
+          c.addEventListener('click', function(){ c.classList.toggle('on'); });
+        });
+        sub.querySelectorAll('[data-close-sub]').forEach(function(b){
+          b.addEventListener('click', function(){ closeSheet(sub); });
+        });
+      },0);
+    });
+  },0);
+}
+document.getElementById('composeBtn').addEventListener('click', function(){
+  openDiary(document.querySelector('#f-diary .screen'));
+});
+document.getElementById('openDiarySheet').addEventListener('click', function(){
+  openDiary(document.querySelector('#f-diary .screen'));
+});
+
+/* ---------- 历史：点击看明细，长按呼出菜单 ---------- */
+var longPressHandled = false;
+document.querySelectorAll('.session').forEach(function(row){
+  var timerLP = null, pressed = false;
+  row.addEventListener('pointerdown', function(){
+    pressed = true; longPressHandled = false;
+    timerLP = setTimeout(function(){
+      if(!pressed) return;
+      longPressHandled = true;
+      if(navigator.vibrate) navigator.vibrate(12);
+      showContextMenu(row.closest('.screen'), row);
+    }, 500);
+  });
+  ['pointerup','pointermove','pointercancel'].forEach(function(ev){
+    row.addEventListener(ev, function(){ pressed = false; clearTimeout(timerLP); });
+  });
+  row.addEventListener('click', function(e){
+    if(longPressHandled){ e.stopPropagation(); return; }
+    openSheet(row.closest('.screen'), detailSheet(+row.getAttribute('data-session')));
+  });
+});
+function showContextMenu(screen, anchor){
+  var old = screen.querySelector('.ctx-menu'); if(old) old.previousSibling && old.previousSibling.remove();
+  var r = anchor.getBoundingClientRect(), sr = screen.getBoundingClientRect();
+  var mask = document.createElement('div'); mask.className = 'ctx-mask';
+  var menu = document.createElement('div'); menu.className = 'ctx-menu';
+  menu.innerHTML =
+    '<button class="ctx-item" data-a="view"><svg><use href="#i-eye"/></svg>查看详情</button>'
+    + '<button class="ctx-item" data-a="copy"><svg><use href="#i-copy"/></svg>复制数据</button>'
+    + '<button class="ctx-item" data-a="export"><svg><use href="#i-export"/></svg>导出会话</button>'
+    + '<button class="ctx-item danger" data-a="del"><svg><use href="#i-trash"/></svg>删除</button>';
+  screen.appendChild(mask); screen.appendChild(menu);
+  var top = Math.min(r.top - sr.top, sr.height - 220);
+  var left = Math.max(12, Math.min(r.left - sr.left, sr.width - 232));
+  menu.style.top = Math.max(60, top) + 'px';
+  menu.style.left = left + 'px';
+  menu.style.setProperty('--cx','50%'); menu.style.setProperty('--cy','50%');
+  requestAnimationFrame(function(){ menu.classList.add('show'); });
+  function kill(){ mask.remove(); menu.remove(); }
+  mask.addEventListener('click', kill);
+  menu.querySelectorAll('.ctx-item').forEach(function(it){
+    it.addEventListener('click', function(){
+      var a = it.getAttribute('data-a');
+      kill();
+      if(a==='view') openSheet(screen, detailSheet(+anchor.getAttribute('data-session')));
+      else if(a==='copy') toast(screen,'会话数据已复制到剪贴板','ok');
+      else if(a==='export') toast(screen,'会话已导出为 JSON','ok');
+      else if(a==='del'){
+        anchor.closest('.surface').querySelectorAll('.row-divider').forEach(function(d){ if(d.nextSibling===anchor||d.previousSibling===anchor) d.remove(); });
+        anchor.remove(); toast(screen,'会话已删除','err');
+      }
+    });
+  });
+}
+
+/* ---------- 设置：开关 / 滑块 / 危险操作 ---------- */
+document.querySelectorAll('[data-switch]').forEach(function(sw){
+  sw.addEventListener('click', function(e){
+    e.stopPropagation();
+    sw.classList.toggle('on');
+    if(sw.hasAttribute('data-theme-switch')) toggleBoardTheme();
+  });
+});
+document.querySelectorAll('input[type=range]').forEach(function(input){
+  function paint(){
+    var min = +input.min, max = +input.max, v = +input.value;
+    input.style.setProperty('--fill', ((v-min)/(max-min)*100) + '%');
+    var out = input.parentElement.querySelector('[data-slv]');
+    var fmt = input.getAttribute('data-fmt');
+    if(fmt==='threshold') out.textContent = (v/100).toFixed(2);
+    else if(fmt==='sens') out.textContent = ['低','中','高'][v];
+    else if(fmt==='min') out.textContent = v + ' 分钟';
+    else out.textContent = v;
+  }
+  input.addEventListener('input', paint); paint();
+});
+document.querySelectorAll('[data-danger]').forEach(function(b){
+  b.addEventListener('click', function(){
+    var screen = b.closest('.screen');
+    var a = b.getAttribute('data-danger');
+    toast(screen, a==='wipe' ? '全部记录已清除（演示）' : '统计数据已重置（演示）', 'err');
+  });
+});
+
+/* ---------- 分析页：日/周切换 ---------- */
+document.querySelectorAll('.segment').forEach(function(seg){
+  seg.querySelectorAll('button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      seg.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+      btn.classList.add('on');
+      var af = document.querySelector('#f-analyze .screen');
+      toast(af, btn.getAttribute('data-seg')==='day' ? '已切换到日视图' : '已切换到周视图', 'info');
+    });
+  });
+});
+
+/* ---------- 24 小时柱状数据 ---------- */
+(function(){
+  var data = [2,0,0,1,3,6,12,22,30,26,18,24,29,21,16,20,27,24,18,14,9,7,4,3];
+  var max = 30;
+  var box = document.getElementById('bars24');
+  data.forEach(function(v,h){
+    var d = document.createElement('div');
+    d.className = 'bar24';
+    d.innerHTML = '<i class="'+(v>=27?'peak':'')+'" style="height:'+(v/max*100)+'%"></i><em>'+h+'</em>';
+    box.appendChild(d);
+  });
+})();
+</script>
+</body>
+</html>

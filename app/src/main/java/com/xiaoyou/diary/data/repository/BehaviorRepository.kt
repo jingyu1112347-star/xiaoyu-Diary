@@ -42,21 +42,28 @@ class BehaviorRepository(context: Context) {
         sensitivity = settings.sensitivity.value,
         threshold = settings.threshold.value
     )
-    private val storage = BehaviorStorage(appContext)
+    // 保留期跟随设置变化，存储层在加载/写入时清理超期记录
+    private val storage = BehaviorStorage(appContext) { settings.storageLimitDays.value }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var analysisJob: Job? = null
     private var recordJob: Job? = null
-    private var reminderJob: Job? = null
     private var sampleRateJob: Job? = null
     private var sensitivityJob: Job? = null
     private var thresholdJob: Job? = null
+
+    // 重入保护：防止重复 startDetection 导致旧协程泄漏与重复写库
+    @Volatile
+    private var detecting = false
 
     private var sessionId: String = ""
     private var sessionStartMs: Long = 0L
 
     private val _latestResult = MutableStateFlow<AnalysisResult?>(null)
     val latestResult: StateFlow<AnalysisResult?> = _latestResult.asStateFlow()
+
+    /** 当前采样率设置，供 UI 如实展示 */
+    val sampleRate: StateFlow<Int> = settings.sampleRate
 
     /** 提醒事件（久坐提醒等），UI 层 collect 后显示 Toast */
     private val _reminderEvent = MutableStateFlow<String?>(null)
@@ -65,22 +72,27 @@ class BehaviorRepository(context: Context) {
 
     val allRecords = storage.records
 
-    fun getRecordsByDate(date: String) = storage.getRecordsByDate(date)
-    fun getRecordsSince(sinceMs: Long) = storage.getRecordsSince(sinceMs)
-
-    suspend fun getBehaviorStatsSince(sinceMs: Long) = storage.getBehaviorStatsSince(sinceMs)
-    suspend fun getHourlyDistribution(date: String) = storage.getHourlyDistribution(date)
     suspend fun clearAllData() = storage.clearAll()
     suspend fun deleteBySessionIds(ids: Set<String>) = storage.deleteBySessionIds(ids)
-    fun exportJson(): String = storage.exportJson()
+    suspend fun exportJson(): String = storage.exportJson()
     suspend fun importJson(json: String): Int = storage.importJson(json)
 
     /** 应用上下文（供 UI 层拿 Application 做文件分享） */
     val applicationContext: Context get() = appContext
 
+    /**
+     * 开始一次检测会话。幂等：重复调用直接忽略，避免旧协程泄漏和重复写库。
+     */
     fun startDetection() {
+        if (detecting) return
+        detecting = true
+
         sessionId = UUID.randomUUID().toString()
         sessionStartMs = System.currentTimeMillis()
+        // 重置久坐连续状态，保证新会话从头累计
+        sedentaryType = null
+        sedentarySinceMs = 0L
+        lastSedentaryReminderMs = 0L
         analyzer.reset()
         sensorCollector.start(settings.sampleRate.value)
 
@@ -89,7 +101,7 @@ class BehaviorRepository(context: Context) {
         sampleRateJob?.cancel()
         sampleRateJob = scope.launch {
             settings.sampleRate.collectLatest { rate ->
-                if (analysisJob?.isActive == true) sensorCollector.updateSampleRate(rate)
+                if (detecting) sensorCollector.updateSampleRate(rate)
             }
         }
         sensitivityJob?.cancel()
@@ -114,6 +126,8 @@ class BehaviorRepository(context: Context) {
                     accelMagnitude = sensorCollector.accelMagnitude.value
                 )
                 _latestResult.value = result
+                updateSedentaryState(result.primaryBehavior, System.currentTimeMillis())
+                maybeFireSedentaryReminder(System.currentTimeMillis())
                 delay(100)
             }
         }
@@ -143,25 +157,45 @@ class BehaviorRepository(context: Context) {
                 )
             }
         }
-
-        startSedentaryReminder()
     }
 
-    /** 久坐提醒：每隔 reminderInterval 分钟检查是否久坐，是则提醒 + 震动 */
-    private fun startSedentaryReminder() {
-        reminderJob?.cancel()
-        reminderJob = scope.launch {
-            while (true) {
-                val intervalMin = settings.reminderInterval.value
-                delay(intervalMin * 60_000L)
-                if (!settings.sedentaryReminder.value) continue
-                val result = _latestResult.value ?: continue
-                if (result.primaryBehavior == BehaviorType.SIT || result.primaryBehavior == BehaviorType.LIE) {
-                    _reminderEvent.value = "久坐提醒：已保持 ${result.primaryBehavior.label} 超过 ${intervalMin} 分钟，起来活动一下吧！"
-                    if (settings.vibration.value) vibrate()
-                }
-            }
+    // ---- 久坐提醒：基于连续坐/躺时长累计，而非到点抽样一帧 ----
+    /** 当前连续久坐姿态（SIT/LIE），非久坐时为 null */
+    private var sedentaryType: BehaviorType? = null
+    /** 当前连续久坐姿态的起始时间戳 */
+    private var sedentarySinceMs: Long = 0L
+    /** 上一次发出久坐提醒的时间戳，用于按间隔重复提醒 */
+    private var lastSedentaryReminderMs: Long = 0L
+
+    private fun isSedentary(type: BehaviorType) =
+        type == BehaviorType.SIT || type == BehaviorType.LIE
+
+    /** 按每帧结果推进连续久坐状态；姿态切换或起身时重新累计 */
+    private fun updateSedentaryState(type: BehaviorType, nowMs: Long) {
+        if (!isSedentary(type)) {
+            sedentaryType = null
+            sedentarySinceMs = 0L
+            lastSedentaryReminderMs = 0L
+            return
         }
+        if (sedentaryType != type) {
+            sedentaryType = type
+            sedentarySinceMs = nowMs
+            lastSedentaryReminderMs = 0L
+        }
+    }
+
+    /** 连续坐/躺达到设定间隔才提醒；之后每过一个间隔重复提醒一次 */
+    private fun maybeFireSedentaryReminder(nowMs: Long) {
+        val type = sedentaryType ?: return
+        val since = sedentarySinceMs
+        if (since <= 0L || !settings.sedentaryReminder.value) return
+        val intervalMs = settings.reminderInterval.value * 60_000L
+        if (nowMs - since < intervalMs) return
+        if (lastSedentaryReminderMs != 0L && nowMs - lastSedentaryReminderMs < intervalMs) return
+        lastSedentaryReminderMs = nowMs
+        _reminderEvent.value = "久坐提醒：已连续保持 ${type.label} 超过 ${settings.reminderInterval.value} 分钟，起来活动一下吧！"
+        if (settings.vibration.value) vibrate()
     }
 
     private fun vibrate() {
@@ -187,29 +221,39 @@ class BehaviorRepository(context: Context) {
         if (settings.vibration.value) vibrate()
     }
 
-    suspend fun stopDetection() {
+    /**
+     * 结束检测会话。
+     * 仅补录最后一个 30 秒周期之后的“零头段”，不再整段重复写入；
+     * @return 本次会话是否实际落盘了补录记录，供 UI 给出准确提示
+     */
+    suspend fun stopDetection(): Boolean {
         analysisJob?.cancel()
         recordJob?.cancel()
-        reminderJob?.cancel()
         sampleRateJob?.cancel()
         sensitivityJob?.cancel()
         thresholdJob?.cancel()
         sensorCollector.stop()
+        detecting = false
 
+        var saved = false
         val result = _latestResult.value
-        if (result != null && result.confidence / 100f >= settings.threshold.value) {
+        val startMs = sessionStartMs
+        if (result != null && result.confidence / 100f >= settings.threshold.value && startMs > 0L) {
             val now = System.currentTimeMillis()
-            val elapsed = ((now - sessionStartMs) / 1000).toInt()
-            if (elapsed > 0) {
+            // 最后一个完整 30 秒周期的边界时间
+            val lastBoundary = startMs + (now - startMs) / 30_000L * 30_000L
+            val remainderSec = ((now - lastBoundary) / 1000L).toInt()
+            // 只补零头（0 表示恰好停在整周期上，无需补录）
+            if (remainderSec > 0) {
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 storage.insert(
                     BehaviorRecordEntity(
                         behaviorName = result.primaryBehavior.name,
                         behaviorLabel = result.primaryBehavior.label,
                         confidence = result.confidence,
-                        startTimeMs = sessionStartMs,
+                        startTimeMs = lastBoundary,
                         endTimeMs = now,
-                        durationSec = elapsed.coerceAtMost(30),
+                        durationSec = remainderSec,
                         pitch = result.pitch,
                         roll = result.roll,
                         yaw = result.yaw,
@@ -217,8 +261,14 @@ class BehaviorRepository(context: Context) {
                         date = dateFormat.format(Date(now))
                     )
                 )
+                saved = true
             }
         }
         _latestResult.value = null
+        sessionStartMs = 0L
+        sedentaryType = null
+        sedentarySinceMs = 0L
+        lastSedentaryReminderMs = 0L
+        return saved
     }
 }
