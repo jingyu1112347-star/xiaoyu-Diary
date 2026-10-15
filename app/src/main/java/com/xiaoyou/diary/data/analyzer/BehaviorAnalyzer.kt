@@ -34,6 +34,9 @@ class BehaviorAnalyzer(
     private val magnitudeWindow = ArrayDeque<Float>()
     private val maxWindowSize = 50
 
+    // userAccel（去除重力的线性加速度）当前分类规则未直接使用，
+    // 但作为识别输入的一部分保留在接口中，供后续更精细的分类器接入
+    @Suppress("UNUSED_PARAMETER")
     fun update(
         userAccel: FloatArray,
         gyro: FloatArray,

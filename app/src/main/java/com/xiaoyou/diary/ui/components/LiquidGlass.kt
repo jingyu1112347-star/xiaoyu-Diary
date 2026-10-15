@@ -19,6 +19,7 @@ import android.view.Choreographer
 import android.view.PixelCopy
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -594,6 +595,7 @@ half4 main(float2 coord) {
     return sampleLinear(coord + d * grad);
 }"""
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private class GlassRuntime(
     val rectShader: RuntimeShader,
     val circleShader: RuntimeShader
@@ -768,6 +770,7 @@ private class BackdropDrawCache {
 }
 
 /** API 33+：对背景做圆角/圆形凸透镜折射后透出 */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private fun ContentDrawScope.drawRefractedBackdrop(
     cache: BackdropDrawCache,
     rt: GlassRuntime,
