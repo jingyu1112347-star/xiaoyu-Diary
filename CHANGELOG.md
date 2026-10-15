@@ -37,7 +37,7 @@ versionCode 2 · 液态玻璃导航与全新视觉
 
 ### 下载
 
-- 体验安装包见本版 Release 附件 `XiaoYouDiary-v1.1.0-debug.apk`（debug 签名，可直接安装体验；正式签名包将在后续版本提供）。
+- 安装包见本版 Release 附件 `XiaoYou-Diary-v1.1.0-debug.apk`（签名与 v1.0.0 一致，可直接覆盖升级安装）。
 
 ## [1.0.0] — 首个版本
 
